@@ -119,13 +119,13 @@ class Margin_cost():
         lignite_cost = 1.76
         # series_values = self.get_tables('bi', 'series_data')
         # powerunit_df = self.get_tables('im', 'power_powerunit_info')
-        lignite_coef = {167: 0.4069, 168: 0.4096, 169: 0.4096, 172: 0.4128, 174: 0.3429,
-                        177: 0.3439, 180: 0.4802, 193: 1, 195:1 , 194:1, 197:1, 196: 1,
-                        189: 0.3469, 192:0.4303, 203: 0.3734, 198: 0.6620}
+        lignite_coef = {5: 0.4069, 6: 0.4096, 7: 0.4096, 10: 0.4128, 12: 0.3429,
+                        15: 0.3439, 18: 0.4802, 31: 1, 33:1 , 32:1, 35:1, 34: 1,
+                        27: 0.3469, 30:0.4303, 41: 0.3734, 36: 0.6620}
         tickers = lignite_coef.keys()
         market_ticker = pd.DataFrame(data={
             'm_id': [21, 21, 21, 13, 24, 6, 23, 33, 34, 56, 35, 36, 25, 3, 11, 12],
-            'series_id': [167, 168, 169, 172, 174, 177, 180, 193, 194, 197, 195, 196, 189, 192, 203, 198]
+            'series_id': [5, 6, 7, 10, 12, 15, 18, 31, 33, 32, 35, 34, 27, 30, 41, 36]
 
         })
         series_values = pd.DataFrame()
@@ -175,24 +175,22 @@ class Margin_cost():
         power_df = self.get_powerunits_country().query('generation_type_id == 6')
 
         powerunit_df = self.get_tables('im', 'power_powerunit_info')
-        coal_coef_base = {165: 0.1639, 170: 0.1434, 173:0.1434, 176:0.1434,
-                          179: 0.1565, 187:0.1434, 190:0.1434, 201:0.1434,
-                          206:0.1434, 199:0.1434, 204:0.1434, 208:0.1434,
-                          185:0.1434, 245:0.1434, 244:0.1434, 246:0.1434
+        coal_coef_base = {3: 0.1639, 8: 0.1434, 11:0.1434, 14:0.1434,
+                          17: 0.1565, 25:0.1434, 28:0.1434, 39:0.1434,
+                          44:0.1434, 37:0.1434, 42:0.1434, 46:0.1434, 23:0.1434, 83:0.1434, 82:0.1434, 84:0.1434
         }
-        coal_coef_low = {166:0.1639, 171:0.1434, 175:0.1434, 178:0.1434,
-                         181: 0.1565, 188:0.1434, 191:0.1434, 202:0.1434,
-                         207:0.1434, 200:0.1434, 205:0.1434, 209:0.1434, 186:0.1434}
+        coal_coef_low = {4:0.1639, 9:0.1434, 13:0.1434, 16:0.1434,
+                         19: 0.1565, 26:0.1434, 29:0.1434, 40:0.1434,
+                         45:0.1434, 38:0.1434, 43:0.1434, 47:0.1434, 24:0.1434}
 
-        coal_coef_high = {210:0.1639, 211:0.1434, 212:0.1434, 213:0.1434,
-                          214: 0.1565, 216:0.1434, 217:0.1434, 219:0.1434,
-                          221:0.1434, 218:0.1434, 220:0.1434, 222:0.1434, 215:0.1434}
+        coal_coef_high = {48:0.1639, 49:0.1434, 50:0.1434, 51:0.1434,
+                          52: 0.1565, 54:0.1434, 55:0.1434, 57:0.1434,
+                          59:0.1434, 56:0.1434, 58:0.1434, 60:0.1434, 53:0.1434}
         market_ticker = pd.DataFrame(data={
             'm_id': [21, 21, 21, 13,13, 13, 24, 24, 24, 6, 6, 6, 23, 23, 23, 25, 25, 25, 3, 3, 3, 11, 11, 11,
                      26, 26, 26, 15, 15, 15, 20, 20, 20, 22, 22, 22, 4, 4, 4, 7, 10, 55],
-            'series_id': [165, 210, 166, 170, 211, 171, 173, 212, 175, 176, 213, 178, 179, 214, 181, 187, 216, 188,
-                          190, 217, 191, 201, 219, 202, 206, 221, 207, 199, 218, 200, 204, 220, 205, 208, 222, 209,
-                          185, 215, 186, 245, 244, 246]})
+            'series_id': [3, 4, 48, 8, 9, 49, 11, 13, 50, 14, 16, 51, 17, 19, 52, 25, 26, 54, 28, 29, 55, 39, 
+                    40, 57, 44, 45, 59, 37, 38, 56, 42, 43, 58, 46, 47, 60, 83, 82, 84 ]})
         if scenario == 1:
             coal_coef = coal_coef_base
         elif scenario ==2:
@@ -251,17 +249,17 @@ class Margin_cost():
         if scenario == 1 :
             market_ticker = pd.DataFrame(data={
                 'm_id': m_id,
-                'series_id': [183] * len(m_id)})
+                'series_id': [21] * len(m_id)})
 
         elif scenario == 2:
             market_ticker = pd.DataFrame(data={
                 'm_id': m_id,
-                'series_id': [225]*len(m_id)})
+                'series_id': [63]*len(m_id)})
             # print(market_ticker)
         else:
             market_ticker = pd.DataFrame(data={
                 'm_id': m_id,
-                'series_id': [224] * len(m_id)})
+                'series_id': [62] * len(m_id)})
 
         tickers = set(market_ticker['series_id'].values)
         series_values = pd.DataFrame()
@@ -308,8 +306,8 @@ class Margin_cost():
         m_id = [21,13, 24, 6, 23, 4, 10, 25, 3, 11, 12, 37, 20, 2, 15, 26, 22,7 , 27]
         market_ticker = pd.DataFrame(data={
             'm_id': m_id,
-            'series_id': [182] * len(m_id)})
-        market_ticker_new = pd.DataFrame(data = {'m_id':[31], 'series_id':[242]})
+            'series_id': [20] * len(m_id)})
+        market_ticker_new = pd.DataFrame(data = {'m_id':[31], 'series_id':[80]})
         market_ticker = pd.concat([market_ticker, market_ticker_new], ignore_index=True)
         # print(market_ticker)
         tickers = set(market_ticker['series_id'].values)
@@ -329,8 +327,8 @@ class Margin_cost():
         m_id = [21,13, 24, 6, 23, 4, 10, 25, 3, 11, 12, 37, 20, 2, 15, 26, 22,7 , 27]
         market_ticker = pd.DataFrame(data={
             'm_id': m_id,
-            'series_id': [182] * len(m_id)})
-        market_ticker_new = pd.DataFrame(data = {'m_id':[31], 'series_id':[242]})
+            'series_id': [20] * len(m_id)})
+        market_ticker_new = pd.DataFrame(data = {'m_id':[31], 'series_id':[80]})
         market_ticker = pd.concat([market_ticker, market_ticker_new], ignore_index=True)
         # print(market_ticker)
         tickers = set(market_ticker['series_id'].values)
