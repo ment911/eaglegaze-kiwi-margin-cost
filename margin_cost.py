@@ -35,9 +35,9 @@ class Margin_cost():
         return table_df
     
     def get_powerunits_country(self):
-        powerunit_data = self.get_tables_iso('im', 'power_powerunit_info')
+        powerunit_data = self.get_tables('im', 'power_powerunit_info')
         powerunit_info = self.get_tables('bi', 'power_unit_info_entsoe')
-        powerunit_co2 = self.get_tables_iso('im', 'power_co2_info')
+        powerunit_co2 = self.get_tables('im', 'power_co2_info')
         countries = self.get_tables('bi', 'countries')
         powerunit_co2 = powerunit_co2.rename(columns={'powerunit_eic_code': 'eic_code'})
         powerunit_info_co2 = pd.merge(powerunit_info, powerunit_co2, how='outer', on='eic_code', indicator=True)
