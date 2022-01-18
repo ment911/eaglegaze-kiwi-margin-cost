@@ -5,6 +5,7 @@ from decouple import config as envs
 from sqlalchemy import create_engine
 from eaglegaze_common import common_utils, entsoe_configs, logger
 from eaglegaze_common.common_attr import Attributes as at
+from eaglegaze_common.common_utils import start_end_microservice_time
 logger = logger.get_logger(__name__, at.LogAttributes.log_file)
 
 
@@ -468,7 +469,7 @@ class Margin_cost():
         self.get_df_per_hour(coal_df, coal_cost, scenario)
         self.get_df_per_hour(gas_df, gas_cost, scenario)
 
-
+    @start_end_microservice_time(1)
     def run_all_scenario(self):
         scenario_list = [1,2,3,4]
         for scenario in scenario_list:
