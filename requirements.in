@@ -1,0 +1,10 @@
+# pandas
+# numpy
+
+# psycopg2-binary
+sqlalchemy
+
+setuptools
+
+# python-dotenv
+python-decouple

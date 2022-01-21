@@ -1,0 +1,71 @@
+# Docker
+# Build a Docker image
+# https://docs.microsoft.com/azure/devops/pipelines/languages/docker
+
+
+name : eaglegaze-kiwi-margin-cost-ci
+
+trigger:
+- main
+- develop
+
+resources:
+- repo: self
+
+variables:
+  tagbuild: '$(Build.BuildId)'
+  ${{ if eq(variables['Build.SourceBranchName'], 'main') }}:
+    tagadd: main
+    GENERAL_BRANCH: main
+  ${{ else }}:
+    tagadd: dev
+    GENERAL_BRANCH: develop
+  ImageName: 'dtrading-eaglegaze-kiwi-margin-cost'
+
+
+stages:
+- stage: Build
+  displayName: Build Docker image
+  variables:
+  - group: eaglegaze_docker
+  jobs:
+  - job: Build
+    displayName: Build
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+    - task: CmdLine@2
+      displayName: Check variables
+      inputs:
+        script: |
+          echo $(tagbuild)
+          echo $(tagadd)
+          echo $(GENERAL_BRANCH)
+    - task: Docker@2
+      displayName: Build an image
+      inputs:
+        command: build
+        repository: $(ImageName)
+        dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
+        tags: |
+          $(tagbuild)
+          $(tagadd)
+        arguments: '--build-arg PATH_TO_SCRIPT=$(PATH_TO_SCRIPT) --build-arg MAIN_DIR=$(MAIN_DIR) --build-arg GIT_SSL_NO_VERIFY=$(GIT_SSL_NO_VERIFY) --build-arg GENERAL_BRANCH=$(GENERAL_BRANCH) --build-arg GIT_TOKEN=$(GIT_TOKEN) --build-arg GIT_HOST=$(GIT_HOST) --build-arg GIT_URN=$(GIT_URN) --build-arg LOG_PATH=$(LOG_PATH) --build-arg LOG_FILE=$(LOG_FILE)'
+    - task: ECRPushImage@1
+      inputs:
+        awsCredentials: 'AWS-ForecastDemand-dev-terraform'
+        regionName: 'eu-central-1'
+        imageSource: 'imagename'
+        sourceImageName: '$(ImageName)'
+        sourceImageTag: $(Build.BuildId)
+        repositoryName: '$(ImageName)'
+        pushTag: $(tagbuild)
+    - task: ECRPushImage@1
+      inputs:
+        awsCredentials: 'AWS-ForecastDemand-dev-terraform'
+        regionName: 'eu-central-1'
+        imageSource: 'imagename'
+        sourceImageName: '$(ImageName)'
+        sourceImageTag: $(Build.BuildId)
+        repositoryName: '$(ImageName)'
+        pushTag: $(tagadd)

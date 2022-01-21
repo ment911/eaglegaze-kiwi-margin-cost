@@ -1,0 +1,28 @@
+version: "3.9"
+
+services:
+  platform:
+    image: eaglegaze_kiwi_margin_cost
+    container_name: margin_cost
+    network_mode: ${NETWORK_MODE}
+    env_file:
+      - .env
+    build:
+      context: .
+      dockerfile: ${DOCKERFILE}
+      args:
+        PATH_TO_SCRIPT: ${PATH_TO_SCRIPT}
+        MAIN_DIR: ${MAIN_DIR}
+        GENERAL_BRANCH: ${GENERAL_BRANCH}
+        GIT_SSL_NO_VERIFY: ${GIT_SSL_NO_VERIFY}
+        GIT_TOKEN: ${GIT_TOKEN}
+        GIT_HOST: ${GIT_HOST}
+        GIT_URN: ${GIT_URN}
+        LOG_PATH: ${LOG_PATH}
+        LOG_FILE: ${LOG_FILE}
+    restart: on-failure
+
+networks:
+  default:
+    external:
+      name: ${NETWORK_MODE}
