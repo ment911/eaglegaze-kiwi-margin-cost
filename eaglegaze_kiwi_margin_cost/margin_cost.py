@@ -159,6 +159,7 @@ class Margin_cost():
             value_country_df = result_df.query('m_id == @country')
             if power_country_df.empty == False:
                 for powerunit in set(power_country_df['unit_id'].values):  # цикл по энергоблокам в стране
+                    logger.info(f"lignite calculating for the {powerunit} powerunit")
                     one_power_df = pd.DataFrame()
                     one_power_df['datetime'] = value_country_df['datetime']
                     one_power_df['powerunit_id'] = [powerunit] * len(value_country_df['datetime'])
@@ -233,6 +234,7 @@ class Margin_cost():
             value_country_df = result_df.query('m_id == @country')
             if power_country_df.empty == False:
                 for powerunit in set(power_country_df['unit_id'].values):  # цикл по энергоблокам в стране
+                    logger.info(f"coal calculating for the {powerunit} powerunit")
                     one_power_df = pd.DataFrame()
                     one_power_df['datetime'] = value_country_df['datetime']
                     one_power_df['powerunit_id'] = [powerunit] * len(value_country_df['datetime'])
@@ -295,6 +297,7 @@ class Margin_cost():
             value_country_df = result_df.query('m_id == @country')
             if power_country_df.empty == False:
                 for powerunit in set(power_country_df['unit_id'].values):  # цикл по энергоблокам в стране
+                    logger.info(f"coal calculating for the {powerunit} powerunit")
                     one_power_df = pd.DataFrame()
                     one_power_df['datetime'] = value_country_df['datetime']
                     one_power_df['powerunit_id'] = [powerunit] * len(value_country_df['datetime'])
