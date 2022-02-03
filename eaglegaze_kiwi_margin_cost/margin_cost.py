@@ -177,8 +177,8 @@ class Margin_cost():
                     one_power_df = one_power_df[one_power_df['datetime'] <= '2022-03-01']
                     self.get_df_per_hour(one_power_df, lignite_cost, scenario, powerunit, 1)
                     total_powerunits = pd.concat([total_powerunits, one_power_df], ignore_index=True)
-                    total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date.date()]
-                    total_powerunits = total_powerunits[total_powerunits['datetime'] <= last_forecast_date.date()]
+                    total_powerunits = total_powerunits[total_powerunits['datetime'] >= '2021-01-01']
+                    total_powerunits = total_powerunits[total_powerunits['datetime'] <= '2022-03-01']
 
         logger.info('lignite was done successfully')
         return total_powerunits
@@ -260,8 +260,8 @@ class Margin_cost():
                     self.get_df_per_hour(one_power_df, coal_cost, scenario, powerunit, 1)
                     # print(one_power_df)
                     total_powerunits = pd.concat([total_powerunits, one_power_df], ignore_index=True)
-                    total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date.date()]
-                    total_powerunits = total_powerunits[total_powerunits['datetime'] <= last_forecast_date.date()]
+                    total_powerunits = total_powerunits[total_powerunits['datetime'] >= '2021-01-01']
+                    total_powerunits = total_powerunits[total_powerunits['datetime'] <= '2022-03-01']
         logger.info('coal was done successfully')
         return total_powerunits
 
@@ -329,8 +329,8 @@ class Margin_cost():
                     self.get_df_per_hour(one_power_df, gas_cost, scenario, powerunit, 1)
                     # print(one_power_df)
                     total_powerunits = pd.concat([total_powerunits, one_power_df], ignore_index=True)
-                    total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date.date()]
-                    total_powerunits = total_powerunits[total_powerunits['datetime'] <= last_forecast_date.date()]
+                    total_powerunits = total_powerunits[total_powerunits['datetime'] >= '2021-01-01']
+                    total_powerunits = total_powerunits[total_powerunits['datetime'] <= '2022-03-01']
                     logger.info('gas was done successfully')
         return total_powerunits
 
