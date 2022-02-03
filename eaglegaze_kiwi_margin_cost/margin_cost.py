@@ -459,9 +459,9 @@ class Margin_cost():
             mfc_market_id = cur.fetchall()[0][0]
             # print(co2_df)
             gfc_val4_df = co2_df.query('unit_id == @powerunit') \
-                [co2_df['datetime'] == x]['value'].values[0]
+                [co2_df['datetime'] == x]['value']
             gfc_val5_df = co2_df.query('unit_id == @powerunit') \
-                [co2_df['datetime'] == x]['gfc_val5'].values[0]
+                [co2_df['datetime'] == x]['gfc_val5']
             if gfc_val4_df.empty == False:
                 gfc_val4 = gfc_val4_df.values[0]
             else:
