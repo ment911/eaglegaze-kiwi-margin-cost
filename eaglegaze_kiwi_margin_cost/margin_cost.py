@@ -485,7 +485,7 @@ class Margin_cost():
                                                                entsoe_configs.COUTRIES_SHIFTS[
                                                                    f"{commodity_df['iso_code'].values[0]}"][0])
 
-            main_df['gfc_market_id'] = [market] * len(da)
+            main_df['gfc_market_id'] = [mfc_market_id] * len(da)
             main_df['gfc_generationunit_id'] = [powerunit] * len(da)
             main_df['gfc_microservice_id'] = [1] * len(da)
             main_df['gfc_indicator_id'] = [14] * len(da)
