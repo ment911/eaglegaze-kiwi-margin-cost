@@ -525,3 +525,5 @@ class Margin_cost():
         for scenario in scenario_list:
             logger.info(f'run scenario {scenario}')
             self.run_commodities(scenario)
+            logger.info(f"scenario {scenario} ended")
+        logger.info('program enfed')
