@@ -150,6 +150,7 @@ class Margin_cost():
             one_ticker_df['value'] = series_values.query('series_id ==@t')['value']
             one_ticker_df['coef'] = [lignite_coef[t]] * len(series_values.query('series_id ==@t')['value'])
             one_ticker_df['gfc_val2'] = series_values.query('series_id ==@t')['value'] * lignite_coef[t]
+
             one_ticker_df['series_id'] = [t] * len(one_ticker_df['value'])
             one_ticker_df['m_id'] = series_values.query('series_id ==@t')['m_id']
             # one_ticker_df['iso_code'] = series_values.query('series_id ==@t')['iso_code']
@@ -167,10 +168,12 @@ class Margin_cost():
                     one_power_df['country'] = [country] * len(value_country_df['datetime'])
                     one_power_df['effectiveness'] = [power_country_df.query('unit_id == @powerunit')[
                                                          'effectiveness'].values[0]] * len(value_country_df['datetime'])
+                    one_power_df['gfc_val8'] = [1 / one_power_df['effectiveness'].values[0] * 0.40709] * len(
+                        value_country_df['datetime'])
                     one_power_df['series_id'] = value_country_df['series_id']
                     one_power_df['value'] = value_country_df['value']
                     one_power_df['gfc_val2'] = value_country_df['gfc_val2']
-                    one_power_df['gfc_val3'] = one_power_df['gfc_val2'] * one_power_df['effectiveness']
+                    one_power_df['gfc_val3'] = one_power_df['gfc_val2'] * one_power_df['effectiveness'] * one_power_df['gfc_val8']
                     one_power_df['iso_code'] = [power_country_df['iso_code'].values[0]] * len(
                         value_country_df['datetime'])
                     one_power_df = one_power_df[one_power_df['datetime'] >= '2021-01-01']
@@ -250,9 +253,10 @@ class Margin_cost():
                     one_power_df['value'] = value_country_df['value']
                     one_power_df['effectiveness'] = [power_country_df.query('unit_id == @powerunit')[
                                                          'effectiveness'].values[0]] * len(value_country_df['datetime'])
-
+                    one_power_df['gfc_val8'] = [1 / one_power_df['effectiveness'].values[0] * 0.14967] * len(
+                        value_country_df['datetime'])
                     one_power_df['gfc_val2'] = value_country_df['gfc_val2']
-                    one_power_df['gfc_val3'] = one_power_df['gfc_val2'] * one_power_df['effectiveness']
+                    one_power_df['gfc_val3'] = one_power_df['gfc_val2'] * one_power_df['effectiveness'] * one_power_df['gfc_val8']
                     one_power_df['iso_code'] = [power_country_df['iso_code'].values[0]] * len(
                         value_country_df['datetime'])
                     one_power_df = one_power_df[one_power_df['datetime'] >= '2021-01-01']
@@ -319,9 +323,10 @@ class Margin_cost():
                     one_power_df['value'] = value_country_df['value']
                     one_power_df['effectiveness'] = [power_country_df.query('unit_id == @powerunit')[
                                                          'effectiveness'].values[0]] * len(value_country_df['datetime'])
-
+                    one_power_df['gfc_val8'] = [1 / one_power_df['effectiveness'].values[0]] * len(
+                        value_country_df['datetime'])
                     one_power_df['gfc_val2'] = value_country_df['gfc_val2']
-                    one_power_df['gfc_val3'] = one_power_df['gfc_val2'] * one_power_df['effectiveness']
+                    one_power_df['gfc_val3'] = one_power_df['gfc_val2'] * one_power_df['gfc_val8']
                     one_power_df['iso_code'] = [power_country_df['iso_code'].values[0]] * len(
                         value_country_df['datetime'])
                     one_power_df = one_power_df[one_power_df['datetime'] >= '2021-01-01']
@@ -471,10 +476,10 @@ class Margin_cost():
                 gfc_val5 = gfc_val5_df.values[0]
             else:
                 gfc_val5 = 0
-            gfc_val6 = None
-            gfc_val7 = commodity_cost
+            gfc_val6 = commodity_cost
+            gfc_val7 = co2_df.query("unit_id == @powerunit ")[co2_df['datetime'] == x]['for_model']
             gfc_val8 = None
-            gfc_val1 = gfc_val3 + gfc_val5 + gfc_val7
+            gfc_val1 = gfc_val3 + gfc_val5 + gfc_val6
 
             main_df['gfc_iteration'] = [self.get_last_iteration()] * len(da)
             main_df['gfc_scenario'] = [scenario] * len(da)
