@@ -173,7 +173,7 @@ class Margin_cost():
                     one_power_df['series_id'] = value_country_df['series_id']
                     one_power_df['value'] = value_country_df['value']
                     one_power_df['gfc_val2'] = value_country_df['gfc_val2']
-                    one_power_df['gfc_val3'] = one_power_df['gfc_val2'] * one_power_df['effectiveness'] * one_power_df['gfc_val8']
+                    one_power_df['gfc_val3'] = one_power_df['gfc_val2'] * one_power_df['gfc_val8']
                     one_power_df['iso_code'] = [power_country_df['iso_code'].values[0]] * len(
                         value_country_df['datetime'])
                     one_power_df = one_power_df[one_power_df['datetime'] >= '2021-01-01']
@@ -256,7 +256,7 @@ class Margin_cost():
                     one_power_df['gfc_val8'] = [1 / one_power_df['effectiveness'].values[0] * 0.14967] * len(
                         value_country_df['datetime'])
                     one_power_df['gfc_val2'] = value_country_df['gfc_val2']
-                    one_power_df['gfc_val3'] = one_power_df['gfc_val2'] * one_power_df['effectiveness'] * one_power_df['gfc_val8']
+                    one_power_df['gfc_val3'] = one_power_df['gfc_val2'] * one_power_df['gfc_val8']
                     one_power_df['iso_code'] = [power_country_df['iso_code'].values[0]] * len(
                         value_country_df['datetime'])
                     one_power_df = one_power_df[one_power_df['datetime'] >= '2021-01-01']
@@ -454,6 +454,8 @@ class Margin_cost():
             x = dates[d]
             gfc_val2 = commodity_df.query("powerunit_id == @powerunit") \
                 [commodity_df['datetime'] == x]['gfc_val2'].values[0]
+            gfc_val8 = commodity_df.query("powerunit_id == @powerunit") \
+                [commodity_df['datetime'] == x]['gfc_val8'].values[0]
             gfc_val3 = commodity_df.query("powerunit_id == @powerunit") \
                 [commodity_df['datetime'] == x]['gfc_val3'].values[0]
             country = commodity_df.query("powerunit_id == @powerunit") \
@@ -478,7 +480,7 @@ class Margin_cost():
                 gfc_val5 = 0
             gfc_val6 = commodity_cost
             gfc_val7 = co2_df.query("unit_id == @powerunit ")[co2_df['datetime'] == x]['for_model']
-            gfc_val8 = None
+            gfc_val8 = gfc_val8
             gfc_val1 = gfc_val3 + gfc_val5 + gfc_val6
 
             main_df['gfc_iteration'] = [self.get_last_iteration()] * len(da)
