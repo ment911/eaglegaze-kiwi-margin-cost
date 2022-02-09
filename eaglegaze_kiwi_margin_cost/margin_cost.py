@@ -285,6 +285,8 @@ class Margin_cost():
                 'm_id': m_id,
                 'series_id': [63] * len(m_id)})
             # print(market_ticker)
+        # elif scenario == 4:
+        #     self.gas_base_backtest(scenario)
         else:
             market_ticker = pd.DataFrame(data={
                 'm_id': m_id,
@@ -338,6 +340,55 @@ class Margin_cost():
                     total_powerunits = total_powerunits[total_powerunits['datetime'] <= '2022-03-01']
                     logger.info('gas was done successfully')
         return total_powerunits
+
+    def gas_base_backtest(self, scenario):
+        gas_cost = 1.8436
+        power_df = self.get_powerunits_country().query('generation_type_id == 2')
+        gas_price_df = self.get_tables_iso('stage', 'im_markets_forecast_calc_daily')
+        market_country_df = self.get_tables_iso('im', 'im_market_country where m_commodity = 2')
+        c_id = [21, 13, 6, 23, 25, 3, 4, 34, 35, 56, 35, 36, 12, 41, 20, 7, 37, 27, 31, 24, 11, 26, 22, 15, 10, 28, 2]
+        m_id = [70, 66, 62, 71, 60, 61, 77, 58, 58, 58, 58, 58, 58, 58, 69, 63, 69, 69, 76, 72, 65, 64, 64, 67, 64, 74, 59]
+        result_df = pd.DataFrame()
+        for market in m_id:
+            # if market==67:
+            daily_df = pd.DataFrame()
+            hourly_df = pd.DataFrame()
+            daily_df['datetime'] = gas_price_df.query('mfc_market_id == @market')['mfc_date']
+            daily_df['gfc_val2'] = gas_price_df.query('mfc_market_id == @market')['mfc_val_1']
+            daily_df['c_id'] = [market_country_df.query("m_id == @market")['m_country'].values[0]] * len(gas_price_df.query('mfc_market_id == @market')['mfc_date'])
+            daily_df['m_id'] = [market] * len(gas_price_df.query('mfc_market_id == @market')['mfc_date'])
+            result_df = pd.concat([result_df, daily_df], ignore_index=True)
+            print(m_id)
+        total_powerunits = pd.DataFrame()
+        for country in c_id:  # цикл по странам
+            power_country_df = power_df.query('id == @country')
+            value_country_df = result_df.query('c_id == @country')
+            if power_country_df.empty == False and value_country_df.empty == False:
+                for powerunit in set(power_country_df['unit_id'].values):  # цикл по энергоблокам в стране
+                    logger.info(f"gas calculating for the {powerunit} powerunit")
+                    one_power_df = pd.DataFrame()
+                    one_power_df['datetime'] = value_country_df['datetime']
+                    one_power_df['powerunit_id'] = [powerunit] * len(value_country_df['datetime'])
+                    one_power_df['country'] = [country] * len(value_country_df['datetime'])
+                    # one_power_df['series_id'] = value_country_df['series_id']
+                    # one_power_df['value'] = value_country_df['value']
+                    one_power_df['effectiveness'] = [power_country_df.query('unit_id == @powerunit')[
+                                                         'effectiveness'].values[0]] * len(value_country_df['datetime'])
+                    one_power_df['gfc_val8'] = [1 / one_power_df['effectiveness'].values[0]] * len(
+                        value_country_df['datetime'])
+                    one_power_df['gfc_val2'] = value_country_df['gfc_val2']
+                    one_power_df['gfc_val3'] = one_power_df['gfc_val2'] * one_power_df['gfc_val8']
+                    one_power_df['iso_code'] = [power_country_df['iso_code'].values[0]] * len(
+                        value_country_df['datetime'])
+                    one_power_df = one_power_df[one_power_df['datetime'] >= '2021-01-01']
+                    one_power_df = one_power_df[one_power_df['datetime'] <= '2022-03-01']
+                    self.get_df_per_hour(one_power_df, gas_cost, scenario, powerunit, 1)
+                    # print(one_power_df)
+                    total_powerunits = pd.concat([total_powerunits, one_power_df], ignore_index=True)
+                    total_powerunits = total_powerunits[total_powerunits['datetime'] >= '2021-01-01']
+                    total_powerunits = total_powerunits[total_powerunits['datetime'] <= '2022-03-01']
+                    logger.info('gas was done successfully')
+
 
     def co2_for_past_periods(self):  # 242-31
 
@@ -534,3 +585,7 @@ class Margin_cost():
             self.run_commodities(scenario)
             logger.info(f"scenario {scenario} ended")
         logger.info('program enfed')
+
+g = Margin_cost()
+# g.gas(1)
+g.gas_base_backtest(1)
