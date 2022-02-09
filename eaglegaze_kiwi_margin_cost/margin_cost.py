@@ -530,7 +530,7 @@ class Margin_cost():
             else:
                 gfc_val5 = 0
             gfc_val6 = commodity_cost
-            gfc_val7 = co2_df.query("unit_id == @powerunit ")[co2_df['datetime'] == x]['for_model']
+            gfc_val7 = co2_df.query("unit_id == @powerunit ")[co2_df['datetime'] == x]['for_model'].values[0]
             gfc_val8 = gfc_val8
             gfc_val1 = gfc_val3 + gfc_val5 + gfc_val6
 
@@ -585,7 +585,3 @@ class Margin_cost():
             self.run_commodities(scenario)
             logger.info(f"scenario {scenario} ended")
         logger.info('program enfed')
-
-g = Margin_cost()
-# g.gas(1)
-g.gas_base_backtest(1)
