@@ -530,7 +530,11 @@ class Margin_cost():
             else:
                 gfc_val5 = 0
             gfc_val6 = commodity_cost
-            gfc_val7 = co2_df.query("unit_id == @powerunit ")[co2_df['datetime'] == x]['for_model'].values[0]
+            if co2_df.query("unit_id == @powerunit ")[co2_df['datetime'] == x]['for_model'].empty == False:
+                gfc_val7 = co2_df.query("unit_id == @powerunit ")[co2_df['datetime'] == x]['for_model'].values[0]
+            else:
+                gfc_val7 = 0
+
             gfc_val8 = gfc_val8
             gfc_val1 = gfc_val3 + gfc_val5 + gfc_val6
 
