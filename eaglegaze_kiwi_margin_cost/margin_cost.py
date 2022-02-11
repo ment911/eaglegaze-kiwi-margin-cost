@@ -411,11 +411,17 @@ class Margin_cost():
         # past_co2_df = past_co2_df[past_co2_df['d_date']>='2021-01-01']
         return past_co2_df
 
-    def co2_for_future_periods(self):  # 242-31
+    def co2_for_future_periods(self, scenario):  # 242-31
         m_id = [21, 13, 24, 6, 23, 4, 10, 25, 3, 11, 12, 37, 20, 2, 15, 26, 22, 7, 27]
+        if scenario == 2:
+            s_id = 77
+        elif scenario ==3:
+            s_id = 78
+        else:
+            s_id = 22
         market_ticker = pd.DataFrame(data={
             'm_id': m_id,
-            'series_id': [20] * len(m_id)})
+            'series_id': [s_id] * len(m_id)})
         market_ticker_new = pd.DataFrame(data={'m_id': [31], 'series_id': [80]})
         market_ticker = pd.concat([market_ticker, market_ticker_new], ignore_index=True)
         # print(market_ticker)
@@ -475,7 +481,7 @@ class Margin_cost():
         logger.info('starting to prepare main data to insert into table')
         powerunits = list(set(commodity_df['powerunit_id'].values))
         co2_df_past = self.co2_for_past_periods()
-        co2_df_future = self.co2_for_future_periods()
+        co2_df_future = self.co2_for_future_periods(scenario)
         co2_df = pd.concat([co2_df_past, co2_df_future], ignore_index=True)
         total_df =pd.DataFrame()
         final_df = pd.DataFrame()
@@ -537,7 +543,7 @@ class Margin_cost():
             if co2_df.query("unit_id == @powerunit ")[co2_df['datetime'] == x]['for_model'].empty == False:
                 gfc_val7 = co2_df.query("unit_id == @powerunit ")[co2_df['datetime'] == x]['for_model'].values[0]
             else:
-                gfc_val7 = 0
+                gfc_val7 = co2_df.query("unit_id == @powerunit ")[co2_df['datetime'] <= x]['for_model'].values[-1]
 
             gfc_val8 = gfc_val8
             gfc_val1 = gfc_val3 + gfc_val5 + gfc_val6
