@@ -285,8 +285,6 @@ class Margin_cost():
                 'm_id': m_id,
                 'series_id': [63] * len(m_id)})
             # print(market_ticker)
-        # elif scenario == 4:
-        #     self.gas_base_backtest(scenario)
         else:
             market_ticker = pd.DataFrame(data={
                 'm_id': m_id,
@@ -388,6 +386,7 @@ class Margin_cost():
                     total_powerunits = total_powerunits[total_powerunits['datetime'] >= '2021-01-01']
                     total_powerunits = total_powerunits[total_powerunits['datetime'] <= '2022-03-01']
                     logger.info('gas was done successfully')
+        return total_powerunits
 
 
     def co2_for_past_periods(self):  # 242-31
@@ -480,6 +479,7 @@ class Margin_cost():
         co2_df = pd.concat([co2_df_past, co2_df_future], ignore_index=True)
         total_df =pd.DataFrame()
         final_df = pd.DataFrame()
+        powerunit = int(powerunit)
         # i=0
         # while i<=len(powerunits):
         # # for powerunit in powerunits:
@@ -523,12 +523,16 @@ class Margin_cost():
             if gfc_val4_df.empty == False:
                 gfc_val4 = gfc_val4_df.values[0]
             else:
-                gfc_val4 = 0
+                gfc_val4_df = co2_df.query('unit_id == @powerunit') \
+                    [co2_df['datetime'] <= x]['value']
+                gfc_val4 = gfc_val4_df.values[-1]
 
             if gfc_val5_df.empty == False:
                 gfc_val5 = gfc_val5_df.values[0]
             else:
-                gfc_val5 = 0
+                gfc_val5_df = co2_df.query('unit_id == @powerunit') \
+                    [co2_df['datetime'] <= x]['gfc_val5']
+                gfc_val5 = gfc_val5_df.values[-1]
             gfc_val6 = commodity_cost
             if co2_df.query("unit_id == @powerunit ")[co2_df['datetime'] == x]['for_model'].empty == False:
                 gfc_val7 = co2_df.query("unit_id == @powerunit ")[co2_df['datetime'] == x]['for_model'].values[0]
