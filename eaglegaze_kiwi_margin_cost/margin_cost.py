@@ -402,7 +402,6 @@ class Margin_cost():
         series_values = pd.DataFrame()
         past_co2_df = pd.DataFrame()
         for t in tickers:
-            t=20
             series_value = self.get_the_furthest_year_of_product(t)
             series_values = pd.concat([series_values, series_value], ignore_index=True)
             date = datetime.now()
@@ -450,7 +449,6 @@ class Margin_cost():
         while i< len(countries):
         # for t in countries:
             t = countries[i]
-            t=13
             power_df = self.get_powerunits_country()
             power_df = power_df.rename(columns={'id': 'm_id'})
             # print(t)
