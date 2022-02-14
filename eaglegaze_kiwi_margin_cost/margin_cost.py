@@ -400,12 +400,15 @@ class Margin_cost():
         # print(market_ticker)
         tickers = set(market_ticker['series_id'].values)
         series_values = pd.DataFrame()
+        past_co2_df = pd.DataFrame()
         for t in tickers:
+            t=20
             series_value = self.get_the_furthest_year_of_product(t)
             series_values = pd.concat([series_values, series_value], ignore_index=True)
-        date = datetime.now()
-        series_values = series_values[series_values['d_date'] <= date]
-        past_co2_df = self.co2(series_values, market_ticker)
+            date = datetime.now()
+            series_values = series_values[series_values['d_date'] <= date]
+            past_co2 = self.co2(series_values, market_ticker)
+            past_co2_df = pd.concat([past_co2_df, past_co2], ignore_index=True)
         past_co2_df = past_co2_df[past_co2_df['_merge'] == 'both']
         past_co2_df.fillna(0, inplace=True)
         # past_co2_df = past_co2_df[past_co2_df['d_date']>='2021-01-01']
@@ -442,32 +445,41 @@ class Margin_cost():
         series_values = series_values[series_values['_merge'] == 'both']
         series_values.drop(columns='_merge')
         result_df = pd.DataFrame()
-        countries = set(market_ticker['m_id'].values)
-
-        for t in countries:
+        countries = list(set(market_ticker['m_id'].values))
+        i = 0
+        while i< len(countries):
+        # for t in countries:
+            t = countries[i]
+            t=13
             power_df = self.get_powerunits_country()
             power_df = power_df.rename(columns={'id': 'm_id'})
             # print(t)
             one_ticker_df = pd.DataFrame()
             one_ticker_df['series_id'] = series_values.query('m_id ==@t')['series_id']
-            serie_id = one_ticker_df['series_id'].values[0]
-            one_ticker_df['datetime'] = series_values.query('series_id ==@serie_id')['d_date']
-            one_ticker_df['m_id'] = [t] * len(one_ticker_df['datetime'])
-            power_df = power_df[power_df['m_id'] == t]
-            if power_df.empty == False:
-                power_df['for_model'].fillna(0, inplace=True)
-                one_ticker_df = pd.merge(one_ticker_df, power_df[['unit_id', 'm_id', 'for_model']], how='outer',
-                                         on='m_id',
-                                         indicator=True)
-                one_ticker_df = one_ticker_df[one_ticker_df['_merge'] == 'both']
-            else:
-                one_ticker_df['for_model'] = [0] * len(one_ticker_df['datetime'])
+            if one_ticker_df.empty ==False:
+                serie_id = one_ticker_df['series_id'].values[0]
+                one_ticker_df['datetime'] = series_values.query('series_id ==@serie_id')['d_date']
+                one_ticker_df['m_id'] = [t] * len(one_ticker_df['datetime'])
+                power_df = power_df[power_df['m_id'] == t]
+                if power_df.empty == False:
+                    power_df['for_model'].fillna(0, inplace=True)
+                    one_ticker_df = pd.merge(one_ticker_df, power_df[['unit_id', 'm_id', 'for_model']], how='outer',
+                                             on='m_id',
+                                             indicator=True)
+                    one_ticker_df = one_ticker_df[one_ticker_df['_merge'] == 'both']
+                else:
+                    one_ticker_df['for_model'] = [0] * len(one_ticker_df['datetime'])
+                one_ticker_df['value'] = series_values.query('m_id == @serie_id')['value']
 
-            one_ticker_df['value'] = series_values.query('series_id ==@serie_id')['value']
-            one_ticker_df['gfc_val5'] = series_values.query('series_id ==@serie_id')['value'] \
-                                        * 0.98 * one_ticker_df['for_model']
-            result_df = pd.concat([result_df, one_ticker_df], ignore_index=True)
-            result_df = result_df[result_df.value.notnull()]
+                one_ticker_df['gfc_val5'] = series_values.query('series_id ==@serie_id')['value'] \
+                                            * 0.98 * one_ticker_df['for_model']
+                result_df = pd.concat([result_df, one_ticker_df], ignore_index=True)
+                result_df = result_df[result_df.value.notnull()]
+
+                i += 1
+            else:
+
+                i+=1
 
         return result_df
 
