@@ -1,7 +1,7 @@
 version: "3.9"
 
 services:
-  platform:
+  eaglegaze_kiwi_margin_cost: &app-image
     image: eaglegaze_kiwi_margin_cost
     container_name: margin_cost
     network_mode: ${NETWORK_MODE}
