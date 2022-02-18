@@ -38,24 +38,26 @@ class Margin_cost():
 
     def get_powerunits_country(self):
         powerunit_data = self.get_tables_iso('im', 'power_powerunit_info')
-        powerunit_info = self.get_tables('bi', 'power_unit_info_entsoe')
+        powerstation_df = self.get_tables('im', 'power_powerstation_info')[['id', 'station', 'country']]
+        powerstation_df = powerstation_df.rename(columns = {'id': 'station_id', 'station': 'powerunit'})
+        powercountry_df = pd.merge(powerstation_df, powerunit_data, how='outer', on='station_id', indicator=True)
+        powercountry_df = powercountry_df[['unit_id', 'country', 'eic_code', 'generation_id', 'effectiveness']]
+        # powerunit_info = self.get_tables('bi', 'power_unit_info_entsoe')
         powerunit_co2 = self.get_tables_iso('im', 'power_co2_info')
         countries = self.get_tables('bi', 'countries')
+        countries = countries.rename(columns={'id':'country'})
         powerunit_co2 = powerunit_co2.rename(columns={'powerunit_eic_code': 'eic_code'})
-        powerunit_info_co2 = pd.merge(powerunit_info, powerunit_co2, how='outer', on='eic_code', indicator=True)
+        powerunit_info_co2 = pd.merge(powercountry_df, powerunit_co2, how='outer', on='eic_code', indicator=True)
         # powerunit_info_co2 = powerunit_info[powerunit_info['_merge'] == 'both']
-        powerunit_info_co2 = powerunit_info_co2.query("_merge == 'both'")[
-            ['unit_name', 'eic_code', 'country_code', 'generation_type_id', 'tso', 'for_model']]
-        power_df = pd.merge(powerunit_data, powerunit_info_co2, how='outer', on='eic_code', indicator=True)
+        powerunit_info_co2 = powerunit_info_co2.query("_merge != 'right_only'")[
+            ['unit_id', 'eic_code', 'country', 'generation_id', 'effectiveness', 'for_model']]
+        # power_df = pd.merge(powerunit_data[['eic_code', 'effectiveness', 'unit_id']], powerunit_info_co2, how='outer', on='eic_code', indicator=True)
+        power_df = pd.merge(powerunit_info_co2, countries[['country', 'iso_code']], how='outer', on='country', indicator=True)
         power_df = power_df[power_df['_merge'] == 'both']
-        # power_df = pd.merge(power_df, powerunit_co2, how='outer', on='eic_code', indicator=True)
-        # power_df = power_df[power_df['_merge'] == 'both']
-        power_df = power_df.rename(columns={'country_code': 'iso_code'})
-        power_df = power_df[['unit_id', 'effectiveness', 'for_model', 'generation_type_id', 'iso_code']]
-        power_df = pd.merge(power_df, countries, how='outer', on='iso_code', indicator=True)
-        power_df = power_df[power_df['_merge'] == 'both']
-        power_df = power_df[['unit_id', 'effectiveness', 'for_model', 'generation_type_id', 'iso_code', 'id']]
+        power_df = power_df[['unit_id', 'effectiveness', 'for_model', 'generation_id', 'iso_code', 'country']]
+        power_df = power_df.rename(columns = {'generation_id': 'generation_type_id', 'country':'id'})
         power_df['for_model'].fillna(0, inplace=True)
+        power_df['effectiveness'].fillna(0.3, inplace=True)
         logger.info('got power data')
         return power_df
 
@@ -206,10 +208,10 @@ class Margin_cost():
                           52: 0.1565, 54: 0.1434, 55: 0.1434, 57: 0.1434,
                           59: 0.1434, 56: 0.1434, 58: 0.1434, 60: 0.1434, 53: 0.1434}
         market_ticker = pd.DataFrame(data={
-            'm_id': [42,42,42, 38, 38, 38, 45, 45, 45, 33, 33, 33, 44, 44, 44, 46, 46, 46, 31, 31, 31, 36, 36, 36,
-                     47, 47, 47, 39, 39, 39, 41, 41, 41, 43, 43, 43, 32, 32, 32, 34, 35, 49],
+            'm_id': [21, 21, 21, 13, 13, 13, 24, 24, 24, 6, 6, 6, 23, 23, 23, 25, 25, 25, 3, 3, 3, 11, 11, 11, 26, 26,
+                     26, 15, 15, 15, 20, 20, 20,22, 22, 22, 4, 4, 4, 7, 10, 55],
             'series_id': [3, 48, 4, 8, 49, 9, 11, 50, 13, 14, 51, 16, 17, 52, 19, 25, 54, 26, 28, 55, 29, 39,
-                    57, 40, 44, 59, 45, 37, 56, 38, 42, 58, 53, 46, 60, 47, 23, 53, 24, 83, 82, 84]})
+                          57, 40, 44, 59, 45, 37, 56, 38, 42, 58, 53, 46, 60, 47, 23, 53, 24, 83, 82, 84]})
         if scenario == 1:
             coal_coef = coal_coef_base
         elif scenario == 2:
@@ -242,6 +244,7 @@ class Margin_cost():
         for country in set(market_ticker['m_id'].values):  # цикл по странам
             power_country_df = power_df.query('id == @country')
             value_country_df = result_df.query('m_id == @country')
+            # if country == 1 or country == 11 or country ==
             if power_country_df.empty == False:
                 for powerunit in set(power_country_df['unit_id'].values):  # цикл по энергоблокам в стране
                     logger.info(f"coal calculating for the {powerunit} powerunit")
@@ -345,7 +348,8 @@ class Margin_cost():
         gas_price_df = self.get_tables_iso('stage', 'im_markets_forecast_calc_daily')
         market_country_df = self.get_tables_iso('im', 'im_market_country where m_commodity = 2')
         c_id = [21, 13, 6, 23, 25, 3, 4, 34, 35, 56, 35, 36, 12, 41, 20, 7, 37, 27, 31, 24, 11, 26, 22, 15, 10, 28, 2]
-        m_id = [70, 66, 62, 71, 60, 61, 77, 58, 58, 58, 58, 58, 58, 58, 69, 63, 69, 69, 76, 72, 65, 64, 64, 67, 64, 74, 59]
+        m_id = [70, 66, 62, 71, 60, 61, 77, 58, 58, 58, 58, 58, 58, 58, 69, 63, 69, 69, 76, 72, 65, 64, 64, 67, 64, 74,
+                59]
         result_df = pd.DataFrame()
         for market in m_id:
             # if market==67:
@@ -353,7 +357,8 @@ class Margin_cost():
             hourly_df = pd.DataFrame()
             daily_df['datetime'] = gas_price_df.query('mfc_market_id == @market')['mfc_date']
             daily_df['gfc_val2'] = gas_price_df.query('mfc_market_id == @market')['mfc_val_1']
-            daily_df['c_id'] = [market_country_df.query("m_id == @market")['m_country'].values[0]] * len(gas_price_df.query('mfc_market_id == @market')['mfc_date'])
+            daily_df['c_id'] = [market_country_df.query("m_id == @market")['m_country'].values[0]] * len(
+                gas_price_df.query('mfc_market_id == @market')['mfc_date'])
             daily_df['m_id'] = [market] * len(gas_price_df.query('mfc_market_id == @market')['mfc_date'])
             result_df = pd.concat([result_df, daily_df], ignore_index=True)
             print(m_id)
@@ -388,7 +393,6 @@ class Margin_cost():
                     logger.info('gas was done successfully')
         return total_powerunits
 
-
     def co2_for_past_periods(self):  # 242-31
 
         m_id = [21, 13, 24, 6, 23, 4, 10, 25, 3, 11, 12, 37, 20, 2, 15, 26, 22, 7, 27]
@@ -417,7 +421,7 @@ class Margin_cost():
         m_id = [21, 13, 24, 6, 23, 4, 10, 25, 3, 11, 12, 37, 20, 2, 15, 26, 22, 7, 27]
         if scenario == 2:
             s_id = 77
-        elif scenario ==3:
+        elif scenario == 3:
             s_id = 78
         else:
             s_id = 22
@@ -446,15 +450,15 @@ class Margin_cost():
         result_df = pd.DataFrame()
         countries = list(set(market_ticker['m_id'].values))
         i = 0
-        while i< len(countries):
-        # for t in countries:
+        while i < len(countries):
+            # for t in countries:
             t = countries[i]
             power_df = self.get_powerunits_country()
             power_df = power_df.rename(columns={'id': 'm_id'})
             # print(t)
             one_ticker_df = pd.DataFrame()
             one_ticker_df['series_id'] = series_values.query('m_id ==@t')['series_id']
-            if one_ticker_df.empty ==False:
+            if one_ticker_df.empty == False:
                 serie_id = one_ticker_df['series_id'].values[0]
                 one_ticker_df['datetime'] = series_values.query('series_id ==@serie_id')['d_date']
                 one_ticker_df['m_id'] = [t] * len(one_ticker_df['datetime'])
@@ -477,7 +481,7 @@ class Margin_cost():
                 i += 1
             else:
 
-                i+=1
+                i += 1
 
         return result_df
 
@@ -493,7 +497,7 @@ class Margin_cost():
         co2_df_past = self.co2_for_past_periods()
         co2_df_future = self.co2_for_future_periods(scenario)
         co2_df = pd.concat([co2_df_past, co2_df_future], ignore_index=True)
-        total_df =pd.DataFrame()
+        total_df = pd.DataFrame()
         final_df = pd.DataFrame()
         powerunit = int(powerunit)
         # i=0
@@ -586,20 +590,18 @@ class Margin_cost():
             if main_df.empty == True:
                 logger.info(f"main dataframe is empty for the generationunit {powerunit}")
             logger.info('duplicates were dropped')
-            insert_into_table(main_df, 'im', 'im_generationunit_forecast_calc',
-                                           custom_conflict_resolution='on conflict do nothing')
+            try:
+                insert_into_table(main_df, 'stage', 'im_generationunit_forecast_calc')
+            except Exception as e:
+                logger.info(f"there is a mistake while inserting unit {powerunit} like {e}")
         total_df = pd.concat([total_df, df], ignore_index=True)
         logger.info(f'data was inserted into im_generationunit_forecast_calc table for generationunit = {powerunit}')
 
-
-
     def run_commodities(self, scenario):
-        lignite_df = self.lignite(scenario)
-        coal_df = self.coal(scenario)
         gas_df = self.gas(scenario)
-        # self.get_df_per_hour(lignite_df, lignite_cost, scenario)
-        # self.get_df_per_hour(coal_df, coal_cost, scenario)
-        # self.get_df_per_hour(gas_df, gas_cost, scenario)
+        coal_df = self.coal(scenario)
+        lignite_df = self.lignite(scenario)
+
 
     @start_end_microservice_time(1)
     def run_all_scenario(self):
@@ -608,4 +610,4 @@ class Margin_cost():
             logger.info(f'run scenario {scenario}')
             self.run_commodities(scenario)
             logger.info(f"scenario {scenario} ended")
-        logger.info('program enfed')
+        logger.info('program ended')
