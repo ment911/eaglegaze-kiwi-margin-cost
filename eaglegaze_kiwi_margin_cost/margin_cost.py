@@ -592,7 +592,7 @@ class Margin_cost():
                 logger.info(f"main dataframe is empty for the generationunit {powerunit}")
             logger.info('duplicates were dropped')
             try:
-                insert_into_table(main_df, 'stage', 'im_generationunit_forecast_calc')
+                insert_into_table(main_df, 'im', 'im_generationunit_forecast_calc')
             except Exception as e:
                 logger.info(f"there is a mistake while inserting unit {powerunit} like {e}")
         total_df = pd.concat([total_df, df], ignore_index=True)
