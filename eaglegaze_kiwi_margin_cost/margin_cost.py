@@ -6,7 +6,8 @@ from sqlalchemy import create_engine
 from eaglegaze_common import entsoe_configs, logger
 from eaglegaze_common.common_attr import Attributes as at
 from eaglegaze_common.common_utils import insert_into_table, substract_time_shift, start_end_microservice_time
-
+import warnings
+warnings.filterwarnings("ignore")
 logger = logger.get_logger(__name__, at.LogAttributes.log_file)
 
 
@@ -599,7 +600,10 @@ class Margin_cost():
         logger.info(f'data was inserted into im_generationunit_forecast_calc table for generationunit = {powerunit}')
 
     def run_commodities(self, scenario):
-        gas_df = self.gas(scenario)
+        if scenario ==1 or scenario ==4:
+            gas_df = self.gas_base_backtest(scenario)
+        else:
+            gas_df = self.gas(scenario)
         coal_df = self.coal(scenario)
         lignite_df = self.lignite(scenario)
 
