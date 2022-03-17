@@ -179,12 +179,12 @@ class Margin_cost():
                     one_power_df['gfc_val3'] = one_power_df['gfc_val2'] * one_power_df['gfc_val8']
                     one_power_df['iso_code'] = [power_country_df['iso_code'].values[0]] * len(
                         value_country_df['datetime'])
-                    one_power_df = one_power_df[one_power_df['datetime'] >= '2021-01-01']
-                    one_power_df = one_power_df[one_power_df['datetime'] <= '2022-03-01']
+                    one_power_df = one_power_df[one_power_df['datetime'] >= first_forecast_date.date()]
+                    one_power_df = one_power_df[one_power_df['datetime'] <= last_forecast_date.date()]
                     self.get_df_per_hour(one_power_df, lignite_cost, scenario, powerunit, 1)
                     total_powerunits = pd.concat([total_powerunits, one_power_df], ignore_index=True)
-                    total_powerunits = total_powerunits[total_powerunits['datetime'] >= '2021-01-01']
-                    total_powerunits = total_powerunits[total_powerunits['datetime'] <= '2022-03-01']
+                    total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date]
+                    total_powerunits = total_powerunits[total_powerunits['datetime'] <= last_forecast_date]
 
         logger.info('lignite was done successfully')
         return total_powerunits
@@ -263,13 +263,13 @@ class Margin_cost():
                     one_power_df['gfc_val3'] = one_power_df['gfc_val2'] * one_power_df['gfc_val8']
                     one_power_df['iso_code'] = [power_country_df['iso_code'].values[0]] * len(
                         value_country_df['datetime'])
-                    one_power_df = one_power_df[one_power_df['datetime'] >= '2021-01-01']
-                    one_power_df = one_power_df[one_power_df['datetime'] <= '2022-03-01']
+                    one_power_df = one_power_df[one_power_df['datetime'] >= first_forecast_date]
+                    one_power_df = one_power_df[one_power_df['datetime'] <= last_forecast_date]
                     self.get_df_per_hour(one_power_df, coal_cost, scenario, powerunit, 1)
                     # print(one_power_df)
                     total_powerunits = pd.concat([total_powerunits, one_power_df], ignore_index=True)
-                    total_powerunits = total_powerunits[total_powerunits['datetime'] >= '2021-01-01']
-                    total_powerunits = total_powerunits[total_powerunits['datetime'] <= '2022-03-01']
+                    total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date]
+                    total_powerunits = total_powerunits[total_powerunits['datetime'] <= last_forecast_date]
         logger.info('coal was done successfully for powerunit')
         return total_powerunits
 
@@ -333,17 +333,18 @@ class Margin_cost():
                     one_power_df['gfc_val3'] = one_power_df['gfc_val2'] * one_power_df['gfc_val8']
                     one_power_df['iso_code'] = [power_country_df['iso_code'].values[0]] * len(
                         value_country_df['datetime'])
-                    one_power_df = one_power_df[one_power_df['datetime'] >= '2021-01-01']
-                    one_power_df = one_power_df[one_power_df['datetime'] <= '2022-03-01']
+                    one_power_df = one_power_df[one_power_df['datetime'] >= first_forecast_date]
+                    one_power_df = one_power_df[one_power_df['datetime'] <= last_forecast_date]
                     self.get_df_per_hour(one_power_df, gas_cost, scenario, powerunit, 1)
                     # print(one_power_df)
                     total_powerunits = pd.concat([total_powerunits, one_power_df], ignore_index=True)
-                    total_powerunits = total_powerunits[total_powerunits['datetime'] >= '2021-01-01']
-                    total_powerunits = total_powerunits[total_powerunits['datetime'] <= '2022-03-01']
+                    total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date]
+                    total_powerunits = total_powerunits[total_powerunits['datetime'] <= last_forecast_date]
                     logger.info('gas was done successfully')
         return total_powerunits
 
     def gas_base_backtest(self, scenario):
+        first_forecast_date, last_forecast_date = self.get_first_last_forecast_date()
         gas_cost = 1.8436
         power_df = self.get_powerunits_country().query('generation_type_id == 2')
         gas_price_df = self.get_tables_iso('stage', 'im_markets_forecast_calc_daily')
@@ -384,13 +385,13 @@ class Margin_cost():
                     one_power_df['gfc_val3'] = one_power_df['gfc_val2'] * one_power_df['gfc_val8']
                     one_power_df['iso_code'] = [power_country_df['iso_code'].values[0]] * len(
                         value_country_df['datetime'])
-                    one_power_df = one_power_df[one_power_df['datetime'] >= '2021-01-01']
-                    one_power_df = one_power_df[one_power_df['datetime'] <= '2022-03-01']
+                    one_power_df = one_power_df[one_power_df['datetime'] >= first_forecast_date.date()]
+                    one_power_df = one_power_df[one_power_df['datetime'] <= last_forecast_date.date()]
                     self.get_df_per_hour(one_power_df, gas_cost, scenario, powerunit, 1)
                     # print(one_power_df)
                     total_powerunits = pd.concat([total_powerunits, one_power_df], ignore_index=True)
-                    total_powerunits = total_powerunits[total_powerunits['datetime'] >= '2021-01-01']
-                    total_powerunits = total_powerunits[total_powerunits['datetime'] <= '2022-03-01']
+                    total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date.date()]
+                    total_powerunits = total_powerunits[total_powerunits['datetime'] <= last_forecast_date.date()]
                     logger.info('gas was done successfully')
         return total_powerunits
 
