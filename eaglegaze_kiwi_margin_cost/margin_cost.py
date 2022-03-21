@@ -179,8 +179,8 @@ class Margin_cost():
                     one_power_df['gfc_val3'] = one_power_df['gfc_val2'] * one_power_df['gfc_val8']
                     one_power_df['iso_code'] = [power_country_df['iso_code'].values[0]] * len(
                         value_country_df['datetime'])
-                    one_power_df = one_power_df[one_power_df['datetime'] >= first_forecast_date.date()]
-                    one_power_df = one_power_df[one_power_df['datetime'] <= last_forecast_date.date()]
+                    one_power_df = one_power_df[one_power_df['datetime'] >= first_forecast_date]
+                    one_power_df = one_power_df[one_power_df['datetime'] <= last_forecast_date]
                     self.get_df_per_hour(one_power_df, lignite_cost, scenario, powerunit, 1)
                     total_powerunits = pd.concat([total_powerunits, one_power_df], ignore_index=True)
                     total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date]
