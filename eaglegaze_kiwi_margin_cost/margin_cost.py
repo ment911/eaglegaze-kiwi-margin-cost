@@ -347,7 +347,7 @@ class Margin_cost():
         first_forecast_date, last_forecast_date = self.get_first_last_forecast_date()
         gas_cost = 1.8436
         power_df = self.get_powerunits_country().query('generation_type_id == 2')
-        gas_price_df = self.get_tables_iso('stage', 'im_markets_forecast_calc_daily')
+        gas_price_df = self.get_tables_iso('im', 'im_markets_forecast_calc_daily')
         market_country_df = self.get_tables_iso('im', 'im_market_country where m_commodity = 2')
         c_id = [21, 13, 6, 23, 25, 3, 4, 34, 35, 56, 35, 36, 12, 41, 20, 7, 37, 27, 31, 24, 11, 26, 22, 15, 10, 28, 2]
         m_id = [70, 66, 62, 71, 60, 61, 77, 58, 58, 58, 58, 58, 58, 58, 69, 63, 69, 69, 76, 72, 65, 64, 64, 67, 64, 74,
