@@ -393,6 +393,7 @@ class Margin_cost():
                     total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date.date()]
                     total_powerunits = total_powerunits[total_powerunits['datetime'] <= last_forecast_date.date()]
                     logger.info('gas was done successfully')
+        total_powerunits = total_powerunits.drop_duplicates(subset=['datetime'], keep='last')
         return total_powerunits
 
     def co2_for_past_periods(self):  # 242-31
@@ -509,7 +510,15 @@ class Margin_cost():
         df = pd.DataFrame()
         logger.info(f"collecting data from {powerunit} powerunit")
         # co2_df = co2_df.query('unit_id == @powerunit')
-        commodity_df = commodity_df.query('powerunit_id == @powerunit')
+        commodity_df = commodity_df.query('powerunit_id == @powerunit').drop_duplicates(subset=['datetime'], keep='last')
+        for i in range(len(commodity_df)-1):
+            try:
+                if commodity_df['gfc_val2'].values[i+1] == 'nan':
+                    commodity_df['gfc_val2'].values[i + 1] = commodity_df['gfc_val2'].values[i]
+                if commodity_df['gfc_val3'].values[i + 1] == 'nan':
+                    commodity_df['gfc_val3'].values[i + 1] = commodity_df['gfc_val3'].values[i]
+            except Exception:
+                pass
         dates = sorted(pd.to_datetime(commodity_df['datetime']))
         co2_df = pd.concat([co2_df_past, co2_df_future], ignore_index=True)
         for d in range(0, len(dates) - 1):
@@ -598,17 +607,23 @@ class Margin_cost():
             except Exception as e:
                 logger.info(f"there is a mistake while inserting unit {powerunit} like {e}")
         total_df = pd.concat([total_df, df], ignore_index=True)
+        # try:
+        #     insert_into_table(total_df, 'stage', 'im_generationunit_forecast_calc')
+        # except Exception as e:
+        #     logger.info(f"there is a mistake while inserting unit {powerunit} like {e}")
         logger.info(f'data was inserted into im_generationunit_forecast_calc table for generationunit = {powerunit}')
 
     def run_commodities(self, scenario):
+        coal_df = self.coal(scenario)
+        lignite_df = self.lignite(scenario)
         if scenario == 1 or scenario == 4:
             gas_df = self.gas_base_backtest(scenario)
         elif scenario == 2 or scenario == 3:
             gas_df = self.gas(scenario)
         else:
             pass
-        coal_df = self.coal(scenario)
-        lignite_df = self.lignite(scenario)
+
+
 
 
     @start_end_microservice_time(1)
