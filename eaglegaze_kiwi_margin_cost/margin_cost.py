@@ -7,6 +7,7 @@ from eaglegaze_common import entsoe_configs, logger
 from eaglegaze_common.common_attr import Attributes as at
 from eaglegaze_common.common_utils import insert_into_table, substract_time_shift, start_end_microservice_time
 import warnings
+
 warnings.filterwarnings("ignore")
 logger = logger.get_logger(__name__, at.LogAttributes.log_file)
 
@@ -40,13 +41,13 @@ class Margin_cost():
     def get_powerunits_country(self):
         powerunit_data = self.get_tables_iso('im', 'power_powerunit_info')
         powerstation_df = self.get_tables('im', 'power_powerstation_info')[['id', 'station', 'country']]
-        powerstation_df = powerstation_df.rename(columns = {'id': 'station_id', 'station': 'powerunit'})
+        powerstation_df = powerstation_df.rename(columns={'id': 'station_id', 'station': 'powerunit'})
         powercountry_df = pd.merge(powerstation_df, powerunit_data, how='outer', on='station_id', indicator=True)
         powercountry_df = powercountry_df[['unit_id', 'country', 'eic_code', 'generation_id', 'effectiveness']]
         # powerunit_info = self.get_tables('bi', 'power_unit_info_entsoe')
         powerunit_co2 = self.get_tables_iso('im', 'power_co2_info')
         countries = self.get_tables('bi', 'countries')
-        countries = countries.rename(columns={'id':'country'})
+        countries = countries.rename(columns={'id': 'country'})
         powerunit_co2 = powerunit_co2.rename(columns={'powerunit_eic_code': 'eic_code'})
         powerunit_info_co2 = pd.merge(powercountry_df, powerunit_co2, how='outer', on='eic_code', indicator=True)
         # powerunit_info_co2 = powerunit_info[powerunit_info['_merge'] == 'both']
@@ -56,7 +57,7 @@ class Margin_cost():
         power_df = pd.merge(powerunit_info_co2, countries[['country', 'iso_code']], how='outer', on='country', indicator=True)
         power_df = power_df[power_df['_merge'] == 'both']
         power_df = power_df[['unit_id', 'effectiveness', 'for_model', 'generation_id', 'iso_code', 'country']]
-        power_df = power_df.rename(columns = {'generation_id': 'generation_type_id', 'country':'id'})
+        power_df = power_df.rename(columns={'generation_id': 'generation_type_id', 'country': 'id'})
         power_df['for_model'].fillna(0, inplace=True)
         power_df['effectiveness'].fillna(0.3, inplace=True)
         logger.info('got power data')
@@ -210,7 +211,7 @@ class Margin_cost():
                           59: 0.1434, 56: 0.1434, 58: 0.1434, 60: 0.1434, 53: 0.1434}
         market_ticker = pd.DataFrame(data={
             'm_id': [21, 21, 21, 13, 13, 13, 24, 24, 24, 6, 6, 6, 23, 23, 23, 25, 25, 25, 3, 3, 3, 11, 11, 11, 26, 26,
-                     26, 15, 15, 15, 20, 20, 20,22, 22, 22, 4, 4, 4, 7, 10, 55],
+                     26, 15, 15, 15, 20, 20, 20, 22, 22, 22, 4, 4, 4, 7, 10, 55],
             'series_id': [3, 48, 4, 8, 49, 9, 11, 50, 13, 14, 51, 16, 17, 52, 19, 25, 54, 26, 28, 55, 29, 39,
                           57, 40, 44, 59, 45, 37, 56, 38, 42, 58, 53, 46, 60, 47, 23, 53, 24, 83, 82, 84]})
         if scenario == 1:
@@ -491,7 +492,7 @@ class Margin_cost():
     def get_last_iteration(self):
         iteration_df = self.get_tables('im', 'im_iteration')
         iteration = max(iteration_df['iteration_id'].values)
-        logger.info(f'got last iteration {iteration}')
+        # logger.info(f'got last iteration {iteration}')
         return iteration
 
     def get_df_per_hour(self, commodity_df, commodity_cost, scenario, powerunit, commodity_id=1):
@@ -513,7 +514,7 @@ class Margin_cost():
         commodity_df = commodity_df.query('powerunit_id == @powerunit').drop_duplicates(subset=['datetime'], keep='last')
         for i in range(len(commodity_df)-1):
             try:
-                if commodity_df['gfc_val2'].values[i+1] == 'nan':
+                if commodity_df['gfc_val2'].values[i + 1] == 'nan':
                     commodity_df['gfc_val2'].values[i + 1] = commodity_df['gfc_val2'].values[i]
                 if commodity_df['gfc_val3'].values[i + 1] == 'nan':
                     commodity_df['gfc_val3'].values[i + 1] = commodity_df['gfc_val3'].values[i]
@@ -601,7 +602,7 @@ class Margin_cost():
             df = pd.concat([df, main_df], ignore_index=True)
             if main_df.empty == True:
                 logger.info(f"main dataframe is empty for the generationunit {powerunit}")
-            logger.info('duplicates were dropped')
+            # logger.info('duplicates were dropped')
             try:
                 insert_into_table(main_df, 'im', 'im_generationunit_forecast_calc')
             except Exception as e:
@@ -614,8 +615,8 @@ class Margin_cost():
         logger.info(f'data was inserted into im_generationunit_forecast_calc table for generationunit = {powerunit}')
 
     def run_commodities(self, scenario):
-        coal_df = self.coal(scenario)
         lignite_df = self.lignite(scenario)
+        coal_df = self.coal(scenario)
         if scenario == 1 or scenario == 4:
             gas_df = self.gas_base_backtest(scenario)
         elif scenario == 2 or scenario == 3:
@@ -623,11 +624,10 @@ class Margin_cost():
         else:
             pass
 
-
-
-
     @start_end_microservice_time(1)
     def run_all_scenario(self):
+        iteration = self.get_last_iteration()
+        logger.info(f'got last iteration {iteration}')
         scenario_list = [1, 2, 3, 4]
         for scenario in scenario_list:
             logger.info(f'run scenario {scenario}')
