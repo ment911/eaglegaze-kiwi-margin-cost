@@ -5,7 +5,7 @@ from decouple import config as envs
 from sqlalchemy import create_engine
 from eaglegaze_common import entsoe_configs, logger
 from eaglegaze_common.common_attr import Attributes as at
-from eaglegaze_common.common_utils import insert_into_table, substract_time_shift, start_end_microservice_time
+from eaglegaze_common.common_utils import insert_into_table, substract_time_shift, start_end_microservice_time, reduce_memory_usage
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -13,14 +13,14 @@ logger = logger.get_logger(__name__, at.LogAttributes.log_file)
 
 
 class Margin_cost():
-    def connection(self):
+    def __connection(self):
         engine = create_engine(envs('ALCHEMY_CONNECTION', cast=str))
         con = engine.raw_connection()
         cur = con.cursor()
         return cur
 
     def get_tables(self, schema, table_name):
-        cur = self.connection()
+        cur = self.__connection()
         cur.execute(
             f"select * from {schema}.{table_name}")
         table_df = pd.DataFrame(cur.fetchall())
@@ -60,6 +60,7 @@ class Margin_cost():
         power_df = power_df.rename(columns={'generation_id': 'generation_type_id', 'country': 'id'})
         power_df['for_model'].fillna(0, inplace=True)
         power_df['effectiveness'].fillna(0.3, inplace=True)
+        power_df = reduce_memory_usage(power_df)
         logger.info('got power data')
         return power_df
 
@@ -86,12 +87,8 @@ class Margin_cost():
         max_year = datetime.strptime(f"{max_year}", '%Y-%m-%d').year
         first_forecast_date, last_forecast_date = self.get_first_last_forecast_date()
         if max_year <= last_forecast_date.year + 1:
-            d = []
-            cap = []
-            for date in range(max_year, last_forecast_date.year + 1):
-                for month in range(1, 13):
-                    d.append(datetime.strptime(f"{date}-{month}-01", '%Y-%m-%d'))
-                    cap.append(last_capacity)
+            d = [datetime.strptime(f"{date}-{month}-01", '%Y-%m-%d') for date in range(max_year, last_forecast_date.year + 1) for month in range(1, 13)]
+            cap = [last_capacity] * len(d)
             additional_series_values = pd.DataFrame(data={
                 'series_id': [series_values['series_id'].values[0]] * 12 * (last_forecast_date.year + 1 - max_year),
                 'frequency_id': [4] * 12 * (last_forecast_date.year + 1 - max_year),
@@ -103,12 +100,9 @@ class Margin_cost():
         first_capacity = series_values['value'].iloc[0]
         min_year = datetime.strptime(f"{min_year}", '%Y-%m-%d').year
         if min_year >= first_forecast_date.year - 1:
-            d = []
-            cap = []
-            for date in range(first_forecast_date.year, min_year):
-                for month in range(1, 13):
-                    d.append(datetime.strptime(f"{date}-{month}-01", '%Y-%m-%d'))
-                cap = [first_capacity] * len(d)
+            d = [datetime.strptime(f"{date}-{month}-01", '%Y-%m-%d') for date in
+                 range(max_year, last_forecast_date.year + 1) for month in range(1, 13)]
+            cap = [first_capacity] * len(d)
             additional_series_values = pd.DataFrame(data={
                 'series_id': [series_values['series_id'].values[0]] * len(d),
                 'frequency_id': [4] * len(d),
@@ -188,13 +182,15 @@ class Margin_cost():
                     total_powerunits = total_powerunits[total_powerunits['datetime'] <= last_forecast_date]
 
         logger.info('lignite was done successfully')
+        total_powerunits = reduce_memory_usage(total_powerunits)
         return total_powerunits
 
     def coal(self, scenario):
         logger.info(f'running coal with {scenario} scenario')
         coal_cost = 1.76
         first_forecast_date, last_forecast_date = self.get_first_last_forecast_date()
-        power_df = self.get_powerunits_country().query('generation_type_id == 6 and unit_id == 2049')
+        power_df = self.get_powerunits_country().query('generation_type_id == 6')
+        # power_df = self.get_powerunits_country().query('generation_type_id == 6 and unit_id == 2049')
 
         # powerunit_df = self.get_tables('im', 'power_powerunit_info')
         coal_coef_base = {3: 0.1639, 8: 0.1434, 11: 0.1434, 14: 0.1434,
@@ -269,8 +265,9 @@ class Margin_cost():
                     self.get_df_per_hour(one_power_df, coal_cost, scenario, powerunit, 1)
                     # print(one_power_df)
                     total_powerunits = pd.concat([total_powerunits, one_power_df], ignore_index=True)
-                    total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date]
-                    total_powerunits = total_powerunits[total_powerunits['datetime'] <= last_forecast_date]
+                    total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date & total_powerunits['datetime'] <= last_forecast_date]
+                    total_powerunits = reduce_memory_usage(total_powerunits)
+                    # total_powerunits = total_powerunits[total_powerunits['datetime'] <= last_forecast_date]
         logger.info('coal was done successfully for powerunit')
         return total_powerunits
 
@@ -339,8 +336,9 @@ class Margin_cost():
                     self.get_df_per_hour(one_power_df, gas_cost, scenario, powerunit, 1)
                     # print(one_power_df)
                     total_powerunits = pd.concat([total_powerunits, one_power_df], ignore_index=True)
-                    total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date]
-                    total_powerunits = total_powerunits[total_powerunits['datetime'] <= last_forecast_date]
+                    total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date & total_powerunits['datetime'] <= last_forecast_date]
+                    # total_powerunits = total_powerunits[total_powerunits['datetime'] <= last_forecast_date]
+                    total_powerunits = reduce_memory_usage(total_powerunits)
                     logger.info('gas was done successfully')
         return total_powerunits
 
@@ -391,8 +389,9 @@ class Margin_cost():
                     self.get_df_per_hour(one_power_df, gas_cost, scenario, powerunit, 1)
                     # print(one_power_df)
                     total_powerunits = pd.concat([total_powerunits, one_power_df], ignore_index=True)
-                    total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date.date()]
-                    total_powerunits = total_powerunits[total_powerunits['datetime'] <= last_forecast_date.date()]
+                    total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date.date() & total_powerunits['datetime'] <= last_forecast_date.date()]
+                    # total_powerunits = total_powerunits[total_powerunits['datetime'] <= last_forecast_date.date()]
+                    total_powerunits = reduce_memory_usage(total_powerunits)
                     logger.info('gas was done successfully')
         total_powerunits = total_powerunits.drop_duplicates(subset=['datetime'], keep='last')
         return total_powerunits
@@ -529,8 +528,9 @@ class Margin_cost():
             delta = dates[d + 1] - dates[d]
             delta = int(f"{delta}".split(' ')[0]) * 24
             # print(delta)
-            for t in range(1, delta):
-                da.append(da[t - 1] + timedelta(hours=1))
+            da = [da[t - 1] + timedelta(hours=1) for t in range(1, delta)]
+            # for t in range(1, delta):
+            #     da.append(da[t - 1] + timedelta(hours=1))
             try:
                 x = dates[d]
                 gfc_val2 = commodity_df.query("powerunit_id == @powerunit") \
@@ -541,7 +541,7 @@ class Margin_cost():
                     [commodity_df['datetime'] == x]['gfc_val3'].values[0]
                 country = commodity_df.query("powerunit_id == @powerunit") \
                     [commodity_df['datetime'] == x]['country'].values[0]
-                cur = self.connection()
+                cur = self.__connection()
                 cur.execute(f"SELECT m_id FROM im.im_market_country "
                             f"WHERE m_commodity = {commodity_id} AND m_country = {country}")
                 mfc_market_id = cur.fetchall()[0][0]
@@ -600,6 +600,7 @@ class Margin_cost():
                 subset=['gfc_iteration', 'gfc_utc_datetime', 'gfc_scenario', 'gfc_generationunit_id',
                         'gfc_microservice_id'])
             df = pd.concat([df, main_df], ignore_index=True)
+            main_df = reduce_memory_usage(main_df)
             if main_df.empty == True:
                 logger.info(f"main dataframe is empty for the generationunit {powerunit}")
             # logger.info('duplicates were dropped')
