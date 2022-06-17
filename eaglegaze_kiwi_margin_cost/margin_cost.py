@@ -118,8 +118,12 @@ class Margin_cost():
     def lignite(self, scenario):
         first_forecast_date, last_forecast_date = self.get_first_last_forecast_date()
         logger.info('running lignite')
-        power_df = self.get_powerunits_country().query('generation_type_id == 7')
-
+        power_df = self.get_powerunits_country().query('generation_type_id == 7 ')
+        # maks_units = pd.DataFrame(data={
+        #     'unit_id': [2076, 175, 176, 177, 1713, 1218, 1219, 1220, 2120, 2121, 2122, 2123, 2124, 1614, 2127, 2128, 2129, 2130, 2131, 2132, 2133, 2134, 2135, 2263, 2265, 2264, 2266, 2295, 763]
+        # })
+        # power_df = pd.merge(power_df, maks_units, how='outer', on='unit_id', indicator=True)
+        # power_df = power_df.query('_merge == "both"')
         lignite_cost = 1.76
         # series_values = self.get_tables('bi', 'series_data')
         # powerunit_df = self.get_tables('im', 'power_powerunit_info')
@@ -178,8 +182,11 @@ class Margin_cost():
                     one_power_df = one_power_df[one_power_df['datetime'] <= last_forecast_date]
                     self.get_df_per_hour(one_power_df, lignite_cost, scenario, powerunit, 1)
                     total_powerunits = pd.concat([total_powerunits, one_power_df], ignore_index=True)
-                    total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date]
-                    total_powerunits = total_powerunits[total_powerunits['datetime'] <= last_forecast_date]
+                    total_powerunits = total_powerunits[
+                        (total_powerunits['datetime'] >= first_forecast_date) &
+                        (total_powerunits['datetime'] <= last_forecast_date)]
+                    # total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date]
+                    # total_powerunits = total_powerunits[total_powerunits['datetime'] <= last_forecast_date]
 
         logger.info('lignite was done successfully')
         total_powerunits = reduce_memory_usage(total_powerunits)
@@ -265,9 +272,12 @@ class Margin_cost():
                     self.get_df_per_hour(one_power_df, coal_cost, scenario, powerunit, 1)
                     # print(one_power_df)
                     total_powerunits = pd.concat([total_powerunits, one_power_df], ignore_index=True)
-                    total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date & total_powerunits['datetime'] <= last_forecast_date]
                     total_powerunits = reduce_memory_usage(total_powerunits)
+                    total_powerunits = total_powerunits[
+                        (total_powerunits['datetime'] >= first_forecast_date) &
+                        (total_powerunits['datetime'] <= last_forecast_date)]
                     # total_powerunits = total_powerunits[total_powerunits['datetime'] <= last_forecast_date]
+                    # total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date]
         logger.info('coal was done successfully for powerunit')
         return total_powerunits
 
@@ -336,7 +346,10 @@ class Margin_cost():
                     self.get_df_per_hour(one_power_df, gas_cost, scenario, powerunit, 1)
                     # print(one_power_df)
                     total_powerunits = pd.concat([total_powerunits, one_power_df], ignore_index=True)
-                    total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date & total_powerunits['datetime'] <= last_forecast_date]
+                    total_powerunits = total_powerunits[
+                        (total_powerunits['datetime'] >= first_forecast_date) &
+                        (total_powerunits['datetime'] <= last_forecast_date)]
+                    # total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date & total_powerunits['datetime'] <= last_forecast_date]
                     # total_powerunits = total_powerunits[total_powerunits['datetime'] <= last_forecast_date]
                     total_powerunits = reduce_memory_usage(total_powerunits)
                     logger.info('gas was done successfully')
@@ -389,7 +402,10 @@ class Margin_cost():
                     self.get_df_per_hour(one_power_df, gas_cost, scenario, powerunit, 1)
                     # print(one_power_df)
                     total_powerunits = pd.concat([total_powerunits, one_power_df], ignore_index=True)
-                    total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date.date() & total_powerunits['datetime'] <= last_forecast_date.date()]
+                    total_powerunits = total_powerunits[
+                        (total_powerunits['datetime'] >= first_forecast_date.date()) &
+                        (total_powerunits['datetime'] <= last_forecast_date.date())]
+                    # total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date.date() & total_powerunits['datetime'] <= last_forecast_date.date()]
                     # total_powerunits = total_powerunits[total_powerunits['datetime'] <= last_forecast_date.date()]
                     total_powerunits = reduce_memory_usage(total_powerunits)
                     logger.info('gas was done successfully')
@@ -528,9 +544,9 @@ class Margin_cost():
             delta = dates[d + 1] - dates[d]
             delta = int(f"{delta}".split(' ')[0]) * 24
             # print(delta)
-            da = [da[t - 1] + timedelta(hours=1) for t in range(1, delta)]
-            # for t in range(1, delta):
-            #     da.append(da[t - 1] + timedelta(hours=1))
+            # da = [da[t - 1] + timedelta(hours=1) for t in range(1, delta)]
+            for t in range(1, delta):
+                da.append(da[t - 1] + timedelta(hours=1))
             try:
                 x = dates[d]
                 gfc_val2 = commodity_df.query("powerunit_id == @powerunit") \
@@ -605,7 +621,7 @@ class Margin_cost():
                 logger.info(f"main dataframe is empty for the generationunit {powerunit}")
             # logger.info('duplicates were dropped')
             try:
-                insert_into_table(main_df, 'im', 'im_generationunit_forecast_calc')
+                insert_into_table(main_df, 'im', 'im_generationunit_forecast_calc', custom_conflict_resolution='on conflict do nothing')
             except Exception as e:
                 logger.info(f"there is a mistake while inserting unit {powerunit} like {e}")
         total_df = pd.concat([total_df, df], ignore_index=True)
@@ -616,8 +632,8 @@ class Margin_cost():
         logger.info(f'data was inserted into im_generationunit_forecast_calc table for generationunit = {powerunit}')
 
     def run_commodities(self, scenario):
-        lignite_df = self.lignite(scenario)
-        coal_df = self.coal(scenario)
+        # lignite_df = self.lignite(scenario)
+        # coal_df = self.coal(scenario)
         if scenario == 1 or scenario == 4:
             gas_df = self.gas_base_backtest(scenario)
         elif scenario == 2 or scenario == 3:
