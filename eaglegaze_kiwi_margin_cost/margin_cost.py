@@ -632,8 +632,8 @@ class Margin_cost():
         logger.info(f'data was inserted into im_generationunit_forecast_calc table for generationunit = {powerunit}')
 
     def run_commodities(self, scenario):
-        # lignite_df = self.lignite(scenario)
-        # coal_df = self.coal(scenario)
+        lignite_df = self.lignite(scenario)
+        coal_df = self.coal(scenario)
         if scenario == 1 or scenario == 4:
             gas_df = self.gas_base_backtest(scenario)
         elif scenario == 2 or scenario == 3:
