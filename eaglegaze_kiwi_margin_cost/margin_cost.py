@@ -5,8 +5,11 @@ from decouple import config as envs
 from sqlalchemy import create_engine
 from eaglegaze_common import entsoe_configs, logger
 from eaglegaze_common.common_attr import Attributes as at
-from eaglegaze_common.common_utils import insert_into_table, substract_time_shift, start_end_microservice_time, reduce_memory_usage
+from eaglegaze_common.common_utils import insert_into_table, substract_time_shift, start_end_microservice_time, \
+    reduce_memory_usage
 import warnings
+from multiprocessing import Pool, Process
+
 
 warnings.filterwarnings("ignore")
 logger = logger.get_logger(__name__, at.LogAttributes.log_file)
@@ -38,31 +41,51 @@ class Margin_cost():
         table_df.columns = [d[0] for d in cur.description]
         return table_df
 
-    def get_powerunits_country(self):
-        powerunit_data = self.get_tables_iso('im', 'power_powerunit_info')
-        powerstation_df = self.get_tables('im', 'power_powerstation_info')[['id', 'station', 'country']]
-        powerstation_df = powerstation_df.rename(columns={'id': 'station_id', 'station': 'powerunit'})
-        powercountry_df = pd.merge(powerstation_df, powerunit_data, how='outer', on='station_id', indicator=True)
-        powercountry_df = powercountry_df[['unit_id', 'country', 'eic_code', 'generation_id', 'effectiveness']]
-        # powerunit_info = self.get_tables('bi', 'power_unit_info_entsoe')
-        powerunit_co2 = self.get_tables_iso('im', 'power_co2_info')
-        countries = self.get_tables('bi', 'countries')
-        countries = countries.rename(columns={'id': 'country'})
-        powerunit_co2 = powerunit_co2.rename(columns={'powerunit_eic_code': 'eic_code'})
-        powerunit_info_co2 = pd.merge(powercountry_df, powerunit_co2, how='outer', on='eic_code', indicator=True)
-        # powerunit_info_co2 = powerunit_info[powerunit_info['_merge'] == 'both']
-        powerunit_info_co2 = powerunit_info_co2.query("_merge != 'right_only'")[
-            ['unit_id', 'eic_code', 'country', 'generation_id', 'effectiveness', 'for_model']]
-        # power_df = pd.merge(powerunit_data[['eic_code', 'effectiveness', 'unit_id']], powerunit_info_co2, how='outer', on='eic_code', indicator=True)
-        power_df = pd.merge(powerunit_info_co2, countries[['country', 'iso_code']], how='outer', on='country', indicator=True)
-        power_df = power_df[power_df['_merge'] == 'both']
-        power_df = power_df[['unit_id', 'effectiveness', 'for_model', 'generation_id', 'iso_code', 'country']]
-        power_df = power_df.rename(columns={'generation_id': 'generation_type_id', 'country': 'id'})
+    def get_powerunit_country(self, generation_type):
+        cur = self.__connection()
+        cur.execute(
+            f"select t.unit_id, effectiveness, for_model,  generation_id, iso_code, t3.id from im.power_powerunit_info t left join im.power_powerstation_info t1 on station_id=id "
+            f"left join im.power_co2_info t2 on t.eic_code=t2.powerunit_eic_code left join bi.countries t3 on country = t3.id "
+            f"where generation_id={generation_type}")
+        power_df = pd.DataFrame(cur.fetchall())
+        power_df.columns = [d[0] for d in cur.description]
+        power_df = power_df[['unit_id', 'effectiveness', 'for_model', 'generation_id', 'iso_code', 'id']]
+        power_df = power_df.rename(columns={'generation_id': 'generation_type_id'})
         power_df['for_model'].fillna(0, inplace=True)
         power_df['effectiveness'].fillna(0.3, inplace=True)
         power_df = reduce_memory_usage(power_df)
         logger.info('got power data')
         return power_df
+
+    # def get_powerunits_country(self):
+    #     p_df = self.get_powerunit_country(7)
+    #     powerunit_data = self.get_tables_iso('im', 'power_powerunit_info')
+    #     powerstation_df = self.get_tables('im', 'power_powerstation_info')[['id', 'station', 'country']]
+    #     powerstation_df = powerstation_df.rename(columns={'id': 'station_id', 'station': 'powerunit'})
+    #     powercountry_df = pd.merge(powerstation_df, powerunit_data, how='outer', on='station_id', indicator=True)
+    #     powercountry_df = powercountry_df[['unit_id', 'country', 'eic_code', 'generation_id', 'effectiveness']]
+    #     # powerunit_info = self.get_tables('bi', 'power_unit_info_entsoe')
+    #     powerunit_co2 = self.get_tables_iso('im', 'power_co2_info')
+    #     countries = self.get_tables('bi', 'countries')
+    #     countries = countries.rename(columns={'id': 'country'})
+    #     powerunit_co2 = powerunit_co2.rename(columns={'powerunit_eic_code': 'eic_code'})
+    #     powerunit_info_co2 = pd.merge(powercountry_df, powerunit_co2, how='outer', on='eic_code', indicator=True)
+    #     # powerunit_info_co2 = powerunit_info[powerunit_info['_merge'] == 'both']
+    #     powerunit_info_co2 = powerunit_info_co2.query("_merge != 'right_only'")[
+    #         ['unit_id', 'eic_code', 'country', 'generation_id', 'effectiveness', 'for_model']]
+    #     powerunit_info_co2 = powerunit_info_co2.drop_duplicates(subset='unit_id')
+    #     # power_df = pd.merge(powerunit_data[['eic_code', 'effectiveness', 'unit_id']], powerunit_info_co2, how='outer', on='eic_code', indicator=True)
+    #     power_df = pd.merge(powerunit_info_co2, countries[['country', 'iso_code']], how='outer', on='country',
+    #                         indicator=True)
+    #     power_df = power_df[power_df['_merge'] == 'both']
+    #     power_df = power_df[['unit_id', 'effectiveness', 'for_model', 'generation_id', 'iso_code', 'country']]
+    #     power_df = power_df.rename(columns={'generation_id': 'generation_type_id', 'country': 'id'})
+    #     power_df['for_model'].fillna(0, inplace=True)
+    #     power_df['effectiveness'].fillna(0.3, inplace=True)
+    #     power_df = power_df.drop_duplicates(subset='unit_id')
+    #     power_df = reduce_memory_usage(power_df)
+    #     logger.info('got power data')
+    #     return power_df
 
     def get_first_last_forecast_date(self):
         # получаем дату начала и конца моделирования из таблицы im.im_iteration
@@ -72,6 +95,8 @@ class Margin_cost():
         last_forecast_date = pd.to_datetime(dates_df['end_forecast_utc'].values[-1])
         logger.info(f'get first_forecast_date, last_forecast_date: {first_forecast_date, last_forecast_date}')
         return first_forecast_date, last_forecast_date
+
+
 
     def get_the_furthest_year_of_product(self, ticker: int):
         # на случай если в таблице power_installed_country_capacity нет годовой мощности до 2030года
@@ -85,13 +110,14 @@ class Margin_cost():
         max_year = date_df.iloc[-1].date()
         last_capacity = series_values['value'].iloc[-1]
         max_year = datetime.strptime(f"{max_year}", '%Y-%m-%d').year
-        first_forecast_date, last_forecast_date = self.get_first_last_forecast_date()
-        if max_year <= last_forecast_date.year + 1:
-            d = [datetime.strptime(f"{date}-{month}-01", '%Y-%m-%d') for date in range(max_year, last_forecast_date.year + 1) for month in range(1, 13)]
+        # first_forecast_date, last_forecast_date = self.get_first_last_forecast_date()
+        if max_year <= self.last_forecast_date.year + 1:
+            d = [datetime.strptime(f"{date}-{month}-01", '%Y-%m-%d') for date in
+                 range(max_year, self.last_forecast_date.year + 1) for month in range(1, 13)]
             cap = [last_capacity] * len(d)
             additional_series_values = pd.DataFrame(data={
-                'series_id': [series_values['series_id'].values[0]] * 12 * (last_forecast_date.year + 1 - max_year),
-                'frequency_id': [4] * 12 * (last_forecast_date.year + 1 - max_year),
+                'series_id': [series_values['series_id'].values[0]] * 12 * (self.last_forecast_date.year + 1 - max_year),
+                'frequency_id': [4] * 12 * (self.last_forecast_date.year + 1 - max_year),
                 'd_date': d,
                 'value': cap
             })
@@ -99,9 +125,9 @@ class Margin_cost():
         min_year = date_df.iloc[0].date()
         first_capacity = series_values['value'].iloc[0]
         min_year = datetime.strptime(f"{min_year}", '%Y-%m-%d').year
-        if min_year >= first_forecast_date.year - 1:
+        if min_year >= self.first_forecast_date.year - 1:
             d = [datetime.strptime(f"{date}-{month}-01", '%Y-%m-%d') for date in
-                 range(max_year, last_forecast_date.year + 1) for month in range(1, 13)]
+                 range(max_year, self.last_forecast_date.year + 1) for month in range(1, 13)]
             cap = [first_capacity] * len(d)
             additional_series_values = pd.DataFrame(data={
                 'series_id': [series_values['series_id'].values[0]] * len(d),
@@ -115,10 +141,11 @@ class Margin_cost():
             series_values.sort_values(by='d_date', ascending=True)
         return series_values
 
+
     def lignite(self, scenario):
-        first_forecast_date, last_forecast_date = self.get_first_last_forecast_date()
+        # first_forecast_date, last_forecast_date = self.get_first_last_forecast_date()
         logger.info('running lignite')
-        power_df = self.get_powerunits_country().query('generation_type_id == 7 ')
+        power_df = self.get_powerunit_country(7)
         # maks_units = pd.DataFrame(data={
         #     'unit_id': [2076, 175, 176, 177, 1713, 1218, 1219, 1220, 2120, 2121, 2122, 2123, 2124, 1614, 2127, 2128, 2129, 2130, 2131, 2132, 2133, 2134, 2135, 2263, 2265, 2264, 2266, 2295, 763]
         # })
@@ -162,7 +189,7 @@ class Margin_cost():
             power_country_df = power_df.query('id == @country')
             value_country_df = result_df.query('m_id == @country')
             if power_country_df.empty == False:
-                for powerunit in set(power_country_df['unit_id'].values):  # цикл по энергоблокам в стране
+                for powerunit in set(power_country_df['unit_id'].values):
                     logger.info(f"lignite calculating for the {powerunit} powerunit")
                     one_power_df = pd.DataFrame()
                     one_power_df['datetime'] = value_country_df['datetime']
@@ -178,25 +205,30 @@ class Margin_cost():
                     one_power_df['gfc_val3'] = one_power_df['gfc_val2'] * one_power_df['gfc_val8']
                     one_power_df['iso_code'] = [power_country_df['iso_code'].values[0]] * len(
                         value_country_df['datetime'])
-                    one_power_df = one_power_df[one_power_df['datetime'] >= first_forecast_date]
-                    one_power_df = one_power_df[one_power_df['datetime'] <= last_forecast_date]
+                    one_power_df = one_power_df[(one_power_df['datetime'] >= self.first_forecast_date) & (one_power_df['datetime'] <= self.last_forecast_date)]
+                    # one_power_df = one_power_df[one_power_df['datetime'] <= self.last_forecast_date]
                     self.get_df_per_hour(one_power_df, lignite_cost, scenario, powerunit, 1)
-                    total_powerunits = pd.concat([total_powerunits, one_power_df], ignore_index=True)
-                    total_powerunits = total_powerunits[
-                        (total_powerunits['datetime'] >= first_forecast_date) &
-                        (total_powerunits['datetime'] <= last_forecast_date)]
+                    # total_powerunits = pd.concat([total_powerunits, one_power_df], ignore_index=True)
+                    # total_powerunits = total_powerunits[
+                    #     (total_powerunits['datetime'] >= self.first_forecast_date) &
+                    #     (total_powerunits['datetime'] <= self.last_forecast_date)]
                     # total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date]
                     # total_powerunits = total_powerunits[total_powerunits['datetime'] <= last_forecast_date]
 
         logger.info('lignite was done successfully')
-        total_powerunits = reduce_memory_usage(total_powerunits)
-        return total_powerunits
+        # total_powerunits = reduce_memory_usage(total_powerunits)
+        # return total_powerunits
 
     def coal(self, scenario):
         logger.info(f'running coal with {scenario} scenario')
         coal_cost = 1.76
-        first_forecast_date, last_forecast_date = self.get_first_last_forecast_date()
-        power_df = self.get_powerunits_country().query('generation_type_id == 6')
+        # first_forecast_date, last_forecast_date = self.get_first_last_forecast_date()
+        power_df = self.get_powerunit_country(6)
+        # maks_units = pd.DataFrame(data={
+        #     'unit_id': [175, 176, 177, 1713, 1218, 1219, 1220, 2121, 2122, 2123, 1614, 2127, 2128, 2129, 2130, 2131, 2132, 2133, 2134, 2135, 2263, 2265, 2266, 2264, 2295, 763]
+        # })
+        # power_df = pd.merge(power_df, maks_units, how='outer', on='unit_id', indicator=True)
+        # power_df = power_df.query('_merge == "both"')
         # power_df = self.get_powerunits_country().query('generation_type_id == 6 and unit_id == 2049')
 
         # powerunit_df = self.get_tables('im', 'power_powerunit_info')
@@ -236,7 +268,7 @@ class Margin_cost():
         series_values = series_values[series_values['_merge'] == 'both']
         series_values.drop(columns='_merge')
         for t in tickers:
-            print(t)
+            # print(t)
             one_ticker_df = pd.DataFrame()
             one_ticker_df['datetime'] = series_values.query('series_id ==@t')['d_date']
             one_ticker_df['value'] = series_values.query('series_id ==@t')['value']
@@ -267,15 +299,15 @@ class Margin_cost():
                     one_power_df['gfc_val3'] = one_power_df['gfc_val2'] * one_power_df['gfc_val8']
                     one_power_df['iso_code'] = [power_country_df['iso_code'].values[0]] * len(
                         value_country_df['datetime'])
-                    one_power_df = one_power_df[one_power_df['datetime'] >= first_forecast_date]
-                    one_power_df = one_power_df[one_power_df['datetime'] <= last_forecast_date]
+                    one_power_df = one_power_df[one_power_df['datetime'] >= self.first_forecast_date]
+                    one_power_df = one_power_df[one_power_df['datetime'] <= self.last_forecast_date]
                     self.get_df_per_hour(one_power_df, coal_cost, scenario, powerunit, 1)
                     # print(one_power_df)
                     total_powerunits = pd.concat([total_powerunits, one_power_df], ignore_index=True)
                     total_powerunits = reduce_memory_usage(total_powerunits)
                     total_powerunits = total_powerunits[
-                        (total_powerunits['datetime'] >= first_forecast_date) &
-                        (total_powerunits['datetime'] <= last_forecast_date)]
+                        (total_powerunits['datetime'] >= self.first_forecast_date) &
+                        (total_powerunits['datetime'] <= self.last_forecast_date)]
                     # total_powerunits = total_powerunits[total_powerunits['datetime'] <= last_forecast_date]
                     # total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date]
         logger.info('coal was done successfully for powerunit')
@@ -284,8 +316,8 @@ class Margin_cost():
     def gas(self, scenario):
         logger.info(f'running gas with {scenario} scenario')
         gas_cost = 1.8436
-        first_forecast_date, last_forecast_date = self.get_first_last_forecast_date()
-        power_df = self.get_powerunits_country().query('generation_type_id == 2')
+        # first_forecast_date, last_forecast_date = self.get_first_last_forecast_date()
+        power_df = self.get_powerunit_country(2)
         m_id = [21, 13, 6, 23, 25, 3, 4, 33, 34, 56, 35, 36, 12, 41, 20, 7, 37, 27, 31, 24, 11, 26, 22, 15, 10, 55, 2]
         if scenario == 1:
             market_ticker = pd.DataFrame(data={
@@ -341,14 +373,14 @@ class Margin_cost():
                     one_power_df['gfc_val3'] = one_power_df['gfc_val2'] * one_power_df['gfc_val8']
                     one_power_df['iso_code'] = [power_country_df['iso_code'].values[0]] * len(
                         value_country_df['datetime'])
-                    one_power_df = one_power_df[one_power_df['datetime'] >= first_forecast_date]
-                    one_power_df = one_power_df[one_power_df['datetime'] <= last_forecast_date]
+                    one_power_df = one_power_df[one_power_df['datetime'] >= self.first_forecast_date]
+                    one_power_df = one_power_df[one_power_df['datetime'] <= self.last_forecast_date]
                     self.get_df_per_hour(one_power_df, gas_cost, scenario, powerunit, 1)
                     # print(one_power_df)
                     total_powerunits = pd.concat([total_powerunits, one_power_df], ignore_index=True)
                     total_powerunits = total_powerunits[
-                        (total_powerunits['datetime'] >= first_forecast_date) &
-                        (total_powerunits['datetime'] <= last_forecast_date)]
+                        (total_powerunits['datetime'] >= self.first_forecast_date) &
+                        (total_powerunits['datetime'] <= self.last_forecast_date)]
                     # total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date & total_powerunits['datetime'] <= last_forecast_date]
                     # total_powerunits = total_powerunits[total_powerunits['datetime'] <= last_forecast_date]
                     total_powerunits = reduce_memory_usage(total_powerunits)
@@ -356,9 +388,9 @@ class Margin_cost():
         return total_powerunits
 
     def gas_base_backtest(self, scenario):
-        first_forecast_date, last_forecast_date = self.get_first_last_forecast_date()
+        logger.info('running gas')
         gas_cost = 1.8436
-        power_df = self.get_powerunits_country().query('generation_type_id == 2')
+        power_df = self.get_powerunit_country(2)
         gas_price_df = self.get_tables_iso('im', 'im_markets_forecast_calc_daily')
         market_country_df = self.get_tables_iso('im', 'im_market_country where m_commodity = 2')
         c_id = [21, 13, 6, 23, 25, 3, 4, 34, 35, 56, 35, 36, 12, 41, 20, 7, 37, 27, 31, 24, 11, 26, 22, 15, 10, 28, 2]
@@ -375,7 +407,7 @@ class Margin_cost():
                 gas_price_df.query('mfc_market_id == @market')['mfc_date'])
             daily_df['m_id'] = [market] * len(gas_price_df.query('mfc_market_id == @market')['mfc_date'])
             result_df = pd.concat([result_df, daily_df], ignore_index=True)
-            print(m_id)
+            # print(m_id)
         total_powerunits = pd.DataFrame()
         for country in c_id:  # цикл по странам
             power_country_df = power_df.query('id == @country')
@@ -397,14 +429,14 @@ class Margin_cost():
                     one_power_df['gfc_val3'] = one_power_df['gfc_val2'] * one_power_df['gfc_val8']
                     one_power_df['iso_code'] = [power_country_df['iso_code'].values[0]] * len(
                         value_country_df['datetime'])
-                    one_power_df = one_power_df[one_power_df['datetime'] >= first_forecast_date.date()]
-                    one_power_df = one_power_df[one_power_df['datetime'] <= last_forecast_date.date()]
+                    one_power_df = one_power_df[one_power_df['datetime'] >= self.first_forecast_date.date()]
+                    one_power_df = one_power_df[one_power_df['datetime'] <= self.last_forecast_date.date()]
                     self.get_df_per_hour(one_power_df, gas_cost, scenario, powerunit, 1)
                     # print(one_power_df)
                     total_powerunits = pd.concat([total_powerunits, one_power_df], ignore_index=True)
                     total_powerunits = total_powerunits[
-                        (total_powerunits['datetime'] >= first_forecast_date.date()) &
-                        (total_powerunits['datetime'] <= last_forecast_date.date())]
+                        (total_powerunits['datetime'] >= self.first_forecast_date.date()) &
+                        (total_powerunits['datetime'] <= self.last_forecast_date.date())]
                     # total_powerunits = total_powerunits[total_powerunits['datetime'] >= first_forecast_date.date() & total_powerunits['datetime'] <= last_forecast_date.date()]
                     # total_powerunits = total_powerunits[total_powerunits['datetime'] <= last_forecast_date.date()]
                     total_powerunits = reduce_memory_usage(total_powerunits)
@@ -462,6 +494,8 @@ class Margin_cost():
         future_co2_df.fillna(0, inplace=True)
         return future_co2_df
 
+
+
     def co2(self, series_values, market_ticker):
         series_values = pd.merge(series_values, market_ticker, how='outer', on='series_id', indicator=True)
         series_values = series_values[series_values['_merge'] == 'both']
@@ -469,15 +503,21 @@ class Margin_cost():
         result_df = pd.DataFrame()
         countries = list(set(market_ticker['m_id'].values))
         i = 0
+        lig_df = self.get_powerunit_country(7)
+        coal_df = self.get_powerunit_country(6)
+        gas_df = self.get_powerunit_country(2)
         while i < len(countries):
             # for t in countries:
             t = countries[i]
-            power_df = self.get_powerunits_country()
-            power_df = power_df.rename(columns={'id': 'm_id'})
+
             # print(t)
             one_ticker_df = pd.DataFrame()
             one_ticker_df['series_id'] = series_values.query('m_id ==@t')['series_id']
             if one_ticker_df.empty == False:
+                power_df = pd.concat(
+                    [gas_df, coal_df , lig_df],
+                    join='outer', ignore_index=True)
+                power_df = power_df.rename(columns={'id': 'm_id'})
                 serie_id = one_ticker_df['series_id'].values[0]
                 one_ticker_df['datetime'] = series_values.query('series_id ==@serie_id')['d_date']
                 one_ticker_df['m_id'] = [t] * len(one_ticker_df['datetime'])
@@ -510,6 +550,8 @@ class Margin_cost():
         # logger.info(f'got last iteration {iteration}')
         return iteration
 
+
+
     def get_df_per_hour(self, commodity_df, commodity_cost, scenario, powerunit, commodity_id=1):
         logger.info('starting to prepare main data to insert into table')
         powerunits = list(set(commodity_df['powerunit_id'].values))
@@ -526,8 +568,9 @@ class Margin_cost():
         df = pd.DataFrame()
         logger.info(f"collecting data from {powerunit} powerunit")
         # co2_df = co2_df.query('unit_id == @powerunit')
-        commodity_df = commodity_df.query('powerunit_id == @powerunit').drop_duplicates(subset=['datetime'], keep='last')
-        for i in range(len(commodity_df)-1):
+        commodity_df = commodity_df.query('powerunit_id == @powerunit').drop_duplicates(subset=['datetime'],
+                                                                                        keep='last')
+        for i in range(len(commodity_df) - 1):
             try:
                 if commodity_df['gfc_val2'].values[i + 1] == 'nan':
                     commodity_df['gfc_val2'].values[i + 1] = commodity_df['gfc_val2'].values[i]
@@ -562,33 +605,44 @@ class Margin_cost():
                             f"WHERE m_commodity = {commodity_id} AND m_country = {country}")
                 mfc_market_id = cur.fetchall()[0][0]
                 # print(co2_df)
-                gfc_val4_df = co2_df.query('unit_id == @powerunit') \
-                    [co2_df['datetime'] == x]['value']
-                gfc_val5_df = co2_df.query('unit_id == @powerunit') \
-                    [co2_df['datetime'] == x]['gfc_val5']
-                if gfc_val4_df.empty == False:
-                    gfc_val4 = gfc_val4_df.values[0]
-                else:
+                try:
                     gfc_val4_df = co2_df.query('unit_id == @powerunit') \
-                        [co2_df['datetime'] <= x]['value']
-                    gfc_val4 = gfc_val4_df.values[-1]
-
-                if gfc_val5_df.empty == False:
-                    gfc_val5 = gfc_val5_df.values[0]
-                else:
+                        [co2_df['datetime'] == x]['value']
                     gfc_val5_df = co2_df.query('unit_id == @powerunit') \
-                        [co2_df['datetime'] <= x]['gfc_val5']
-                    gfc_val5 = gfc_val5_df.values[-1]
+                        [co2_df['datetime'] == x]['gfc_val5']
+                    if gfc_val4_df.empty == False:
+                        gfc_val4 = gfc_val4_df.values[0]
+                    else:
+                        gfc_val4_df = co2_df.query('unit_id == @powerunit') \
+                            [co2_df['datetime'] <= x]['value']
+                        gfc_val4 = gfc_val4_df.values[-1]
+
+                    if gfc_val5_df.empty == False:
+                        gfc_val5 = gfc_val5_df.values[0]
+                    else:
+                        gfc_val5_df = co2_df.query('unit_id == @powerunit') \
+                            [co2_df['datetime'] <= x]['gfc_val5']
+                        gfc_val5 = gfc_val5_df.values[-1]
+                except Exception as e:
+                    gfc_val5 = 0
+                    gfc_val4 = 0
+                    logger.info(f"there is problem {e} with co2 with unit {powerunit}")
+
                 gfc_val6 = commodity_cost
-                if co2_df.query("unit_id == @powerunit ")[co2_df['datetime'] == x]['for_model'].empty == False:
-                    gfc_val7 = co2_df.query("unit_id == @powerunit ")[co2_df['datetime'] == x]['for_model'].values[0]
-                else:
-                    gfc_val7 = co2_df.query("unit_id == @powerunit ")[co2_df['datetime'] <= x]['for_model'].values[-1]
+                try:
+                    if co2_df.query("unit_id == @powerunit ")[co2_df['datetime'] == x]['for_model'].empty == False:
+                        gfc_val7 = co2_df.query("unit_id == @powerunit ")[co2_df['datetime'] == x]['for_model'].values[
+                            0]
+                    else:
+                        gfc_val7 = co2_df.query("unit_id == @powerunit ")[co2_df['datetime'] <= x]['for_model'].values[
+                            -1]
+                except Exception:
+                    gfc_val7 = 0
 
                 gfc_val8 = gfc_val8
                 gfc_val1 = gfc_val3 + gfc_val5 + gfc_val6
 
-                main_df['gfc_iteration'] = [self.get_last_iteration()] * len(da)
+                main_df['gfc_iteration'] = [self.iteration] * len(da)
                 main_df['gfc_scenario'] = [scenario] * len(da)
                 main_df['gfc_local_datetime'] = da
                 main_df['gfc_utc_datetime'] = substract_time_shift(da,
@@ -621,17 +675,15 @@ class Margin_cost():
                 logger.info(f"main dataframe is empty for the generationunit {powerunit}")
             # logger.info('duplicates were dropped')
             try:
-                insert_into_table(main_df, 'im', 'im_generationunit_forecast_calc', custom_conflict_resolution='on conflict do nothing')
+                insert_into_table(main_df, 'im', 'im_generationunit_forecast_calc',
+                                  custom_conflict_resolution='on conflict do nothing')
             except Exception as e:
                 logger.info(f"there is a mistake while inserting unit {powerunit} like {e}")
-        total_df = pd.concat([total_df, df], ignore_index=True)
-        # try:
-        #     insert_into_table(total_df, 'stage', 'im_generationunit_forecast_calc')
-        # except Exception as e:
-        #     logger.info(f"there is a mistake while inserting unit {powerunit} like {e}")
-        logger.info(f'data was inserted into im_generationunit_forecast_calc table for generationunit = {powerunit}')
+        # total_df = pd.concat([total_df, df], ignore_index=True)
+        logger.info(f'data was inserted into im_generationunit_forecast_calc table for generationunit = {powerunit} for scenario {scenario}')
 
     def run_commodities(self, scenario):
+
         lignite_df = self.lignite(scenario)
         coal_df = self.coal(scenario)
         if scenario == 1 or scenario == 4:
@@ -643,11 +695,42 @@ class Margin_cost():
 
     @start_end_microservice_time(1)
     def run_all_scenario(self):
-        iteration = self.get_last_iteration()
-        logger.info(f'got last iteration {iteration}')
+        self.first_forecast_date, self.last_forecast_date = self.get_first_last_forecast_date()
+        self.iteration = self.get_last_iteration()
+        logger.info(f'got last iteration {self.iteration}')
+        p = Pool()
+        p1 = Pool()
+
         scenario_list = [1, 2, 3, 4]
+        # p.map(self.lignite, scenario_list)
+        # p.close()
+        # p.join()
+        # p1.map(self.coal, scenario_list)
+        # p1.close()
+        # p1.join()
+
+
         for scenario in scenario_list:
+            p1 = Process(target=self.lignite, args=(scenario,))
+            p2 = Process(target=self.coal, args=(scenario,))
+
+            if scenario == 1 or scenario == 4:
+                p3 = Process(target=self.gas_base_backtest, args=(scenario,))
+                # p3.start()
+                # p3.join()
+            else:
+                p3 = Process(target=self.gas, args=(scenario,))
+                # p3.start()
+                # p3.join()
+            p1.start()
+            p2.start()
+            p3.start()
+            p1.join()
+            p2.join()
+            p3.start()
+            p3.join()
+
             logger.info(f'run scenario {scenario}')
-            self.run_commodities(scenario)
+            # self.run_commodities(scenario)
             logger.info(f"scenario {scenario} ended")
         logger.info('program ended')
