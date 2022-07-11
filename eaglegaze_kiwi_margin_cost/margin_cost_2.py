@@ -34,7 +34,7 @@ class MarginCost:
         self.var_cost = pd.DataFrame({'var_cost': ['coal', 'lignite', 'gas'],
                                       'price': [1.76, 1.76, 1.8436],
                                       'generation_type_id': [6, 7, 2],
-                                      'heating_value': [149.67, 407.09, 75.]})
+                                      'heating_value': [149.67, 407.09, 2.]})
         self.all_series_data = None
         self.lignite_price_method = None
         self.coal_price_method = None
@@ -51,15 +51,17 @@ class MarginCost:
         self.units = self.get_units()
         self.co2_rates = self.get_co2_rates()
         self.get_all_series()
+        # print(111)
 
     def get_all_series(self):
         cur.execute(f"select * from bi.series_data where d_date >= '{self.start_timestamp}' "
                     f"and d_date <= '{self.end_timestamp}';")
         self.all_series_data = pd.DataFrame(cur.fetchall(), columns=[d[0] for d in cur.description])
+        self.all_series_data['d_date'] = self.all_series_data['d_date'].astype('datetime64[ns]')
 
     def get_units(self):
         cur.execute(f'select unit_id, power_powerunit_info.eic_code as eic_code, generation_id, '
-                    f'start_date, end_date, country, m_id from im.power_powerunit_info left join '
+                    f'start_date, end_date, country, m_id, effectiveness from im.power_powerunit_info left join '
                     f'im.power_powerstation_info on power_powerunit_info.station_id = power_powerstation_info.id '
                     f'left join im.im_market_country on country = m_country where model_id = 1;')
         units = pd.DataFrame(cur.fetchall(), columns=[d[0] for d in cur.description])
@@ -99,8 +101,12 @@ class MarginCost:
                                            'coef': [1] * 27})
         gas_price_method_2 = gas_price_method_1.copy()
         gas_price_method_3 = gas_price_method_1.copy()
+        ###
+        gas_price_method_1['series_id'] = 21  # TEMPORARY SOLUTION - NOT ALL series_id ARE CORRECT!
+        ###
         gas_price_method_2['series_id'] = 63
         gas_price_method_3['series_id'] = 62
+
         self.gas_price_method = {1: gas_price_method_1, 2: gas_price_method_2, 3: gas_price_method_3}
 
         co2_price_method_1 = pd.DataFrame(
@@ -170,22 +176,24 @@ class MarginCost:
         if init_df.empty:
             return pd.DataFrame()
         df = init_df.copy()
-        if df['gfc_utc_datetime'].min() <= datetime.today() <= df['gfc_utc_datetime'].max():
-            df_1 = df[df['gfc_utc_datetime'] <= datetime.today()]
-            df_1 = pd.merge(df_1, self.co2_price_method_past[scenario], how='left', left_on='gfc_market_id',
-                            right_on='m_id')
-            df_1 = df_1.rename(columns={'series_id_x': 'series_id', 'coef_x': 'coef',
-                                        'series_id_y': 'series_id_co2', 'coef_y': 'coef_co2'})
+        # if df['gfc_utc_datetime'].min() <= datetime.today() <= df['gfc_utc_datetime'].max():
+        df_1 = df[df['gfc_utc_datetime'] <= datetime.today()]
+        df_1 = pd.merge(df_1, self.co2_price_method_past[scenario], how='left', left_on='gfc_market_id',
+                        right_on='m_id')
+        df_1 = df_1.rename(columns={'series_id_x': 'series_id', 'coef_x': 'coef',
+                                    'series_id_y': 'series_id_co2', 'coef_y': 'coef_co2'})
 
-            df_2 = df[df['gfc_utc_datetime'] > datetime.today()]
-            df_2 = pd.merge(df_2, self.co2_price_method_future[scenario], how='left', left_on='gfc_market_id',
-                            right_on='m_id')
-            df_2 = df_2.rename(columns={'series_id_x': 'series_id', 'coef_x': 'coef',
-                                        'series_id_y': 'series_id_co2', 'coef_y': 'coef_co2'})
+        df_2 = df[df['gfc_utc_datetime'] > datetime.today()]
+        df_2 = pd.merge(df_2, self.co2_price_method_future[scenario], how='left', left_on='gfc_market_id',
+                        right_on='m_id')
+        df_2 = df_2.rename(columns={'series_id_x': 'series_id', 'coef_x': 'coef',
+                                    'series_id_y': 'series_id_co2', 'coef_y': 'coef_co2'})
 
-            df = df_1.append(df_2, ignore_index=True)
-            df.drop(columns=['m_id'], inplace=True)
+        df = df_1.append(df_2, ignore_index=True)
+        df.drop(columns=['m_id'], inplace=True)
+        # ENDIF
         df['series_id'] = df['series_id'].astype(int)
+        df['gfc_utc_datetime'] = df['gfc_utc_datetime'].astype('datetime64[ns]')
         if 'series_id_co2' in df.columns:
             try:
                 df = pd.merge(df, self.series_data_co2, how='left', left_on=['series_id_co2', 'gfc_utc_datetime'],
@@ -195,10 +203,11 @@ class MarginCost:
                 df['value'] = df['value'].fillna(method='ffill')
                 df = df.dropna()
                 df = df.rename(columns={'value': 'gfc_val_4'})
-            except IndexError:
-                print(df)
-                sys.exit(1)
-            except ValueError:
+            except IndexError as e:
+                logger.error(f'IndexError in {init_df["gfc_generationunit_id"].unique().tolist()[0]}: {e}')
+                pass
+            except ValueError as e:
+                logger.error(f'ValueError in {init_df["gfc_generationunit_id"].unique().tolist()[0]}: {e}')
                 pass
         if eic in self.co2_rates['powerunit_eic_code'].values:
             if 'gfc_val_4' in df.columns:
@@ -215,9 +224,14 @@ class MarginCost:
             return pd.DataFrame()
         df = init_df.copy()
         df['generation_series_price'] = df['generation_series_price'] * df['coef'] + 0.3
-
+        eff = self.units[self.units['unit_id'] == df['gfc_generationunit_id'].values[0]]['effectiveness'].values[0]
         gen_id = self.units[self.units['unit_id'] == df['gfc_generationunit_id'].values[0]]['generation_id'].values[0]
-        df['gfc_val_8'] = self.var_cost[self.var_cost['generation_type_id'] == gen_id]['heating_value'].values[0]
+        if gen_id == 2:
+            df['gfc_val_8'] = 1 / eff
+        else:
+            df['gfc_val_8'] = 1 / eff * \
+                              self.var_cost[self.var_cost['generation_type_id'] == gen_id]['heating_value'].values[
+                                  0] / 1000
         df['gfc_val_6'] = self.var_cost[self.var_cost['generation_type_id'] == gen_id]['price'].values[0]
         df['gfc_val_3'] = df['gfc_val_8'] * df['generation_series_price']
         df = df.rename(columns={'generation_series_price': 'gfc_val_2'})
@@ -254,7 +268,7 @@ class MarginCost:
             df_prices = self.series_data_coal
             df_method = self.coal_price_method
         elif gen_id == 7:
-            df_prices = self.series_data_coal
+            df_prices = self.series_data_lignite
             df_method = self.lignite_price_method
         df = self.merge_prices(init_df, df_prices, df_method, scenario)
         return df
@@ -289,15 +303,16 @@ class MarginCost:
             start_iter = time.time()
             logger.info(f'Started from {iter_var}')
             with concurrent.futures.ThreadPoolExecutor() as executor:
-                results = executor.map(self.iterate_unit, self.units['unit_id'][iter_var:iter_var + step])
+                results = executor.map(self.iterate_unit,
+                                       self.units['unit_id'][iter_var:iter_var + step])
                 for result in results:
                     if result is not None and not result.empty:
                         df = df.append(result, ignore_index=True)
             logger.info(f'{datetime.now()} - Inserting len = {len(df)}...')
             for chunk in chunker(df, 100000):
-                insert_into_table(chunk, shema_name='im2',
+                insert_into_table(chunk, shema_name='im',
                                   table_name='im_generationunit_forecast_calc',
-                                  constraint='im_generationunit_forecast_ca_gfc_iteration_gfc_scenario_gf_key',
+                                  constraint='unique_constraint_gfc',
                                   primary_key=False)
             df = df.iloc[0:0]
             iter_var += step
@@ -314,7 +329,7 @@ class MarginCost:
             if len(df) > 1_000_000:
                 logger.info(f'Inserting on {iter_var}')
                 #for chunk in chunker(df, 100000):
-                insert_into_table(df, shema_name='im2',
+                insert_into_table(df, shema_name='im',
                                   table_name='im_generationunit_forecast_calc',
                                   constraint='im_generationunit_forecast_ca_gfc_iteration_gfc_scenario_gf_key',
                                   primary_key=False)
