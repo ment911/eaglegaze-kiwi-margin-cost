@@ -63,7 +63,8 @@ class MarginCost:
         cur.execute(f'select unit_id, power_powerunit_info.eic_code as eic_code, generation_id, '
                     f'start_date, end_date, country, m_id, effectiveness from im.power_powerunit_info left join '
                     f'im.power_powerstation_info on power_powerunit_info.station_id = power_powerstation_info.id '
-                    f'left join im.im_market_country on country = m_country where model_id = 1;')
+                    f'left join im.im_market_country on country = m_country where model_id = 1 '
+                    f'and powerunit_status = \'operational\';')
         units = pd.DataFrame(cur.fetchall(), columns=[d[0] for d in cur.description])
         units = units[units['generation_id'].isin(self.var_cost['generation_type_id'].tolist())]
         return units
@@ -150,8 +151,10 @@ class MarginCost:
     def spread_timestamps(self, unit_df):
         df = pd.DataFrame()
         df['gfc_utc_datetime'] = pd.date_range(start=self.start_timestamp, end=self.end_timestamp, freq='H')
-        df = df[(df['gfc_utc_datetime'] >= pd.to_datetime(unit_df['start_date']).tolist()[0]) &
-                (df['gfc_utc_datetime'] <= pd.to_datetime(unit_df['end_date']).tolist()[0])]
+        if unit_df['start_date'].tolist()[0] is not None:
+            df = df[(df['gfc_utc_datetime'] >= pd.to_datetime(unit_df['start_date']).tolist()[0])]
+        if unit_df['end_date'].tolist()[0] is not None:
+            df = df[(df['gfc_utc_datetime'] <= pd.to_datetime(unit_df['end_date']).tolist()[0])]
         return df
 
     def spread_values_for_dates(self, values_df, hourly_df, rename_value=None):
@@ -164,10 +167,22 @@ class MarginCost:
             df.rename(columns={'value': rename_value}, inplace=True)
         return df
 
-    def merge_prices(self, init_df, price_df, method_df, scenario):
+    def merge_prices(self, init_df, price_df, method_df, scenario, gen_id):
         df = init_df.copy()
-        df = pd.merge(df, method_df[scenario], left_on='gfc_market_id', right_on='m_id').drop(
-            columns=['m_id'])
+        if gen_id == 2:
+            if not df.empty:
+                if df['gfc_market_id'].unique()[0] not in method_df[scenario]['m_id'].tolist():
+                    df['series_id'] = method_df[scenario]['series_id'].tolist()[0]
+                    df['coef'] = 1
+                else:
+                    df = pd.merge(df, method_df[scenario], left_on='gfc_market_id', right_on='m_id').drop(
+                        columns=['m_id'])
+            else:
+                df = pd.merge(df, method_df[scenario], left_on='gfc_market_id', right_on='m_id').drop(
+                    columns=['m_id'])
+        else:
+            df = pd.merge(df, method_df[scenario], left_on='gfc_market_id', right_on='m_id').drop(
+                columns=['m_id'])
         df = self.spread_values_for_dates(values_df=price_df, hourly_df=df,
                                           rename_value='generation_series_price')
         return df
@@ -201,14 +216,14 @@ class MarginCost:
                 df = df.drop(columns=['series_id_y', 'frequency_id', 'd_date', 'sdt_id'])
                 df = df.rename(columns={'series_id_x': 'series_id'})
                 df['value'] = df['value'].fillna(method='ffill')
-                df = df.dropna()
+                df = df.dropna(axis=1, how='all')
                 df = df.rename(columns={'value': 'gfc_val_4'})
             except IndexError as e:
-                logger.error(f'IndexError in {init_df["gfc_generationunit_id"].unique().tolist()[0]}: {e}')
-                pass
+                logger.error(f'IndexError in {init_df["gfc_generationunit_id"].unique().tolist()[0]}: {e} \nTrying again')
+                return 'ERROR'
             except ValueError as e:
-                logger.error(f'ValueError in {init_df["gfc_generationunit_id"].unique().tolist()[0]}: {e}')
-                pass
+                logger.error(f'ValueError in {init_df["gfc_generationunit_id"].unique().tolist()[0]}: {e} \nTrying again')
+                return 'ERROR'
         if eic in self.co2_rates['powerunit_eic_code'].values:
             if 'gfc_val_4' in df.columns:
                 df['gfc_val_5'] = df['gfc_val_4'] * \
@@ -270,22 +285,36 @@ class MarginCost:
         elif gen_id == 7:
             df_prices = self.series_data_lignite
             df_method = self.lignite_price_method
-        df = self.merge_prices(init_df, df_prices, df_method, scenario)
+        df = self.merge_prices(init_df, df_prices, df_method, scenario, gen_id)
         return df
 
     def iterate_unit(self, unit_id):
         unit = self.units[self.units['unit_id'] == unit_id]
         df_out = pd.DataFrame()
+        # if unit['generation_id'].tolist()[0] != 2:
+        #     return df_out
         for scenario in (1, 2, 3):
             df = self.spread_timestamps(unit)
             df['gfc_generationunit_id'] = unit_id
             df['gfc_market_id'] = unit['m_id'].tolist()[0]
             self.fill_dfs(scenario)
             df['gfc_scenario'] = scenario
+            # try:
             df = self.commodity_iter(df, unit['generation_id'].tolist()[0], scenario)
-            df = self.merge_co2(df, unit['eic_code'].tolist()[0], scenario)
+            df_co2 = self.merge_co2(df, unit['eic_code'].tolist()[0], scenario)
+            counter = 0
+            while str(df_co2) == 'ERROR':
+                df_co2 = self.merge_co2(df, unit['eic_code'].tolist()[0], scenario)
+                counter += 1
+                if counter > 10:
+                    break
+            df = df_co2.copy()
+            del df_co2
             df = self.rename_and_rebase(df)
             df_out = df_out.append(df, ignore_index=True)
+            # except:
+            #     print(unit_id)
+            #     sys.exit(1)
         # logger.info(unit_id)
         df_out.drop_duplicates(subset=['gfc_iteration', 'gfc_scenario', 'gfc_utc_datetime',
                                        'gfc_generationunit_id', 'gfc_microservice_id'], inplace=True)
@@ -297,14 +326,17 @@ class MarginCost:
         logger.info(f'{datetime.now()} - Started margin cost microservice. \n')
         df = pd.DataFrame()
         N = len(self.units['unit_id'])
+        # N = 1
         iter_var = 0
         step = 100
+        '''
         while iter_var < N:
             start_iter = time.time()
             logger.info(f'Started from {iter_var}')
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 results = executor.map(self.iterate_unit,
-                                       self.units['unit_id'][iter_var:iter_var + step])
+                                       [22])
+                                       # self.units['unit_id'][iter_var:iter_var + step])
                 for result in results:
                     if result is not None and not result.empty:
                         df = df.append(result, ignore_index=True)
@@ -328,16 +360,20 @@ class MarginCost:
             df = df.append(res, ignore_index=True)
             if len(df) > 1_000_000:
                 logger.info(f'Inserting on {iter_var}')
-                #for chunk in chunker(df, 100000):
-                insert_into_table(df, shema_name='im',
-                                  table_name='im_generationunit_forecast_calc',
-                                  constraint='im_generationunit_forecast_ca_gfc_iteration_gfc_scenario_gf_key',
-                                  primary_key=False)
+                for chunk in chunker(df, 100000):
+                    insert_into_table(chunk, shema_name='im',
+                                      table_name='im_generationunit_forecast_calc',
+                                      constraint='unique_constraint_gfc',
+                                      primary_key=False)
                 df = df.iloc[0:0]
             iter_var += 1
             # if iter_var % 100 == 0:
-            logger.info(f'Done {iter_var} / {N} in {round(time.time() - a, 2)}')
-        '''
+            logger.info(f'Done {iter_var} / {N} in {round(time.time() - a, 2)}, len {len(res)}')
+        for chunk in chunker(df, 100000):
+            insert_into_table(chunk, shema_name='im',
+                              table_name='im_generationunit_forecast_calc',
+                              constraint='unique_constraint_gfc',
+                              primary_key=False)
         logger.info(f'Finished in {round((time.time() - start_time), 1)} seconds.')
 
     @staticmethod
